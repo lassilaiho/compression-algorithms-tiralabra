@@ -1,4 +1,6 @@
-/huffman
-/huffman.exe
-/lz77
-/lz77.exe
+/huffmancmd
+/huffmancmd.exe
+/lz77cmd
+/lz77cmd.exe
+
+/*.out

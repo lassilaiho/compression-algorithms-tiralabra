@@ -1,0 +1,268 @@
+package huffman
+
+import (
+	"bufio"
+	"container/heap"
+	"errors"
+	"fmt"
+	"io"
+)
+
+// Encode encodes all data from input using Huffman coding and writes the result
+// to output. The encoding is self-describing.
+func Encode(input io.ReadSeeker, output io.Writer) error {
+	if _, err := input.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	src := bufio.NewReader(input)
+	var freqs frequencyTable
+	if err := countFrequencies(src, &freqs); err != nil {
+		return err
+	}
+	if _, err := input.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	src.Reset(input)
+	dst := newBitWriter(output)
+	tree := buildCodeTree(&freqs)
+	if tree == nil {
+		return io.EOF
+	}
+	table := newCodeTable(tree)
+	if err := tree.encodeTo(dst); err != nil {
+		return err
+	}
+	if err := dst.WriteInt64(freqs.byteCount()); err != nil {
+		return err
+	}
+	return table.Encode(src, dst)
+}
+
+// Decode decodes data encoded using Encode from input and writes the unencoded
+// data to output.
+func Decode(input io.Reader, output io.Writer) error {
+	src := newBitReader(input)
+	dst := bufio.NewWriter(output)
+	codeTree, err := decodeCodeTree(src)
+	if err != nil {
+		return err
+	}
+	byteCount, err := src.ReadInt64()
+	if err != nil {
+		return err
+	}
+	for ; byteCount > 0; byteCount-- {
+		byt, err := codeTree.readCode(src)
+		if err != nil {
+			return err
+		}
+		if err := dst.WriteByte(byt); err != nil {
+			return err
+		}
+	}
+	return dst.Flush()
+}
+
+// codeTable maps byte values to Huffman codes.
+type codeTable [256]bitList
+
+// Encode encodes all data in src using table and writes the result to dst.
+func (table *codeTable) Encode(src *bufio.Reader, dst *bitWriter) error {
+	for {
+		b, err := src.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return dst.Flush()
+			}
+			return err
+		}
+		if err := dst.WriteBits(&table[b]); err != nil {
+			return err
+		}
+	}
+}
+
+// newCodeTable constructs the codeTable corresponding codeTree.
+func newCodeTable(codeTree *codeTreeNode) *codeTable {
+	table := &codeTable{}
+	code := bitList{}
+	buildCodeTable(table, &code, codeTree)
+	return table
+}
+
+func buildCodeTable(table *codeTable, code *bitList, codeTree *codeTreeNode) {
+	if codeTree.left == nil {
+		table[codeTree.symbol] = code.Copy()
+		return
+	}
+	code.Append(false)
+	buildCodeTable(table, code, codeTree.left)
+	code.Set(code.Len()-1, true)
+	buildCodeTable(table, code, codeTree.right)
+	code.Shrink(1)
+}
+
+type frequencyTable [256]int64
+
+// countFrequencies counts the occurrences of each byte value in input and
+// writes the results to freqs. Entries for byte values not encountered in input
+// are not zeroed in freqs.
+func countFrequencies(input *bufio.Reader, freqs *frequencyTable) error {
+	for {
+		b, err := input.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return fmt.Errorf("failed to count frequencies: %w", err)
+		}
+		freqs[b]++
+	}
+}
+
+// byteCount returns the total size in bytes of the data represnted by t.
+func (t *frequencyTable) byteCount() int64 {
+	var n int64
+	for _, x := range *t {
+		n += x
+	}
+	return n
+}
+
+// TODO: improve documentation about this, including that the tree is always
+// complete, symbol stores lead of subtree in internal nodes
+
+// codeTreeNode is a node in a code tree. The tree is always a complete binary
+// tree.
+type codeTreeNode struct {
+	left, right *codeTreeNode // both nil iff the node is a leaf node
+	symbol      byte          // meaningless for non-leaf nodes
+}
+
+// buildCodeTree builds a code tree using freqs.
+func buildCodeTree(freqs *frequencyTable) *codeTreeNode {
+	queue := priorityQueue{}
+	heap.Init(&queue)
+	for symbol, freq := range freqs {
+		if freq > 0 {
+			heap.Push(&queue, &queueItem{
+				node: &codeTreeNode{
+					symbol: byte(symbol),
+				},
+				frequency: freq,
+				index:     symbol,
+			})
+		}
+	}
+	if queue.Len() == 0 {
+		return nil
+	}
+	for queue.Len() >= 2 {
+		left := heap.Pop(&queue).(*queueItem)
+		right := heap.Pop(&queue).(*queueItem)
+		heap.Push(&queue, &queueItem{
+			node: &codeTreeNode{
+				left:  left.node,
+				right: right.node,
+			},
+			frequency: left.frequency + right.frequency,
+		})
+	}
+	return queue.Pop().(*queueItem).node
+}
+
+// encodeTo encodes tree and writes the result to out.
+func (tree *codeTreeNode) encodeTo(out *bitWriter) error {
+	if tree.left == nil {
+		if err := out.WriteBit(true); err != nil {
+			return err
+		}
+		return out.WriteByte(tree.symbol)
+	}
+	if err := out.WriteBit(false); err != nil {
+		return err
+	}
+	if err := tree.left.encodeTo(out); err != nil {
+		return err
+	}
+	return tree.right.encodeTo(out)
+}
+
+// decodeCodeTree decodes a code tree from src that was previously encoded using
+// encodeTo.
+func decodeCodeTree(src *bitReader) (*codeTreeNode, error) {
+	bit, err := src.ReadBit()
+	if err != nil {
+		return nil, err
+	}
+	if bit {
+		symbol, err := src.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		return &codeTreeNode{symbol: symbol}, nil
+	}
+	left, err := decodeCodeTree(src)
+	if err != nil {
+		return nil, err
+	}
+	right, err := decodeCodeTree(src)
+	if err != nil {
+		return nil, err
+	}
+	return &codeTreeNode{left: left, right: right}, nil
+}
+
+// readCode reads a code from src and returns the corresponding byte value.
+func (tree *codeTreeNode) readCode(src *bitReader) (byte, error) {
+	if tree.left == nil {
+		return tree.symbol, nil
+	}
+	bit, err := src.ReadBit()
+	if err != nil {
+		return 0, err
+	}
+	if bit {
+		return tree.right.readCode(src)
+	}
+	return tree.left.readCode(src)
+}
+
+// queueItem is an item in a priorityQueue.
+type queueItem struct {
+	node      *codeTreeNode
+	frequency int64
+	index     int // required by "container/heap" package
+}
+
+// priorityQueue is a priority queue of codeTreeNodes.
+type priorityQueue []*queueItem
+
+func (pq priorityQueue) Len() int { return len(pq) }
+
+func (pq priorityQueue) Less(i, j int) bool {
+	return pq[i].frequency < pq[j].frequency
+}
+
+func (pq priorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].index = i
+	pq[j].index = j
+}
+
+func (pq *priorityQueue) Push(x interface{}) {
+	n := len(*pq)
+	item := x.(*queueItem)
+	item.index = n
+	*pq = append(*pq, item)
+}
+
+func (pq *priorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil
+	item.index = -1
+	*pq = old[0 : n-1]
+	return item
+}
