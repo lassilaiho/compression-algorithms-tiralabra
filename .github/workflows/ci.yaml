@@ -30,3 +30,6 @@ jobs:
 
     - name: Test
       run: make test
+    
+    - name: Create test coverage report
+      run: bash <(curl -s https://codecov.io/bash)
