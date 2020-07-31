@@ -129,9 +129,6 @@ func (t *frequencyTable) byteCount() int64 {
 	return n
 }
 
-// TODO: improve documentation about this, including that the tree is always
-// complete, symbol stores lead of subtree in internal nodes
-
 // codeTreeNode is a node in a code tree. The tree is always a complete binary
 // tree.
 type codeTreeNode struct {
