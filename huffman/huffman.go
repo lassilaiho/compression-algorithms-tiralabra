@@ -1,3 +1,14 @@
+/*
+Package huffman implements the Huffman coding algorithm. Data can be encoded
+and decoded using Encode and Decode, respectively.
+
+The output of Encode is formatted as follows:
+
+	encoded code tree
+	size of uncompressed data as a little endian int64 value
+	encoded data
+	possible zero bits to pad the result to full bytes
+*/
 package huffman
 
 import (
@@ -9,7 +20,7 @@ import (
 )
 
 // Encode encodes all data from input using Huffman coding and writes the result
-// to output. The encoding is self-describing.
+// to output.
 func Encode(input io.ReadSeeker, output io.Writer) error {
 	if _, err := input.Seek(0, io.SeekStart); err != nil {
 		return err
