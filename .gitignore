@@ -4,3 +4,6 @@
 /lz77cmd.exe
 
 /*.out
+
+*.huff
+*.dec
