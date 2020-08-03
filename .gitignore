@@ -6,4 +6,5 @@
 /*.out
 
 *.huff
+*.lz77
 *.dec
