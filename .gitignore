@@ -3,7 +3,8 @@
 /lz77cmd
 /lz77cmd.exe
 
-/*.out
+*.out
+*.test
 
 *.huff
 *.lz77
