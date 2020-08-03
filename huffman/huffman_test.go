@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"testing"
 )
@@ -150,4 +151,18 @@ func TestDecode(t *testing.T) {
 	expectNil(t, Encode(strings.NewReader(input), &buf))
 	expectNil(t, Decode(&buf, &output))
 	check(t, input, output.String())
+}
+
+func BenchmarkEncode(b *testing.B) {
+	input, err := ioutil.ReadFile("../test/kalevala.txt")
+	if err != nil {
+		b.Fatal(err)
+	}
+	r := bytes.NewReader(input)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Reset(input)
+		var buf bytes.Buffer
+		Encode(r, &buf)
+	}
 }
