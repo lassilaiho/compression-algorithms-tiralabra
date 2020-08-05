@@ -13,7 +13,6 @@ package huffman
 
 import (
 	"bufio"
-	"container/heap"
 	"errors"
 	"fmt"
 	"io"
@@ -150,25 +149,24 @@ type codeTreeNode struct {
 // buildCodeTree builds a code tree using freqs.
 func buildCodeTree(freqs *frequencyTable) *codeTreeNode {
 	queue := priorityQueue{}
-	heap.Init(&queue)
 	for symbol, freq := range freqs {
 		if freq > 0 {
-			heap.Push(&queue, &queueItem{
+			queue = append(queue, &queueItem{
 				node: &codeTreeNode{
 					symbol: byte(symbol),
 				},
 				frequency: freq,
-				index:     symbol,
 			})
 		}
 	}
+	queue.Init()
 	if queue.Len() == 0 {
 		return nil
 	}
 	for queue.Len() >= 2 {
-		left := heap.Pop(&queue).(*queueItem)
-		right := heap.Pop(&queue).(*queueItem)
-		heap.Push(&queue, &queueItem{
+		left := queue.Pop()
+		right := queue.Pop()
+		queue.Push(&queueItem{
 			node: &codeTreeNode{
 				left:  left.node,
 				right: right.node,
@@ -176,7 +174,7 @@ func buildCodeTree(freqs *frequencyTable) *codeTreeNode {
 			frequency: left.frequency + right.frequency,
 		})
 	}
-	return queue.Pop().(*queueItem).node
+	return queue.Pop().node
 }
 
 // encodeTo encodes tree and writes the result to out.
@@ -234,43 +232,4 @@ func (tree *codeTreeNode) readCode(src *bitReader) (byte, error) {
 		return tree.right.readCode(src)
 	}
 	return tree.left.readCode(src)
-}
-
-// queueItem is an item in a priorityQueue.
-type queueItem struct {
-	node      *codeTreeNode
-	frequency int64
-	index     int // required by "container/heap" package
-}
-
-// priorityQueue is a priority queue of codeTreeNodes.
-type priorityQueue []*queueItem
-
-func (pq priorityQueue) Len() int { return len(pq) }
-
-func (pq priorityQueue) Less(i, j int) bool {
-	return pq[i].frequency < pq[j].frequency
-}
-
-func (pq priorityQueue) Swap(i, j int) {
-	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
-}
-
-func (pq *priorityQueue) Push(x interface{}) {
-	n := len(*pq)
-	item := x.(*queueItem)
-	item.index = n
-	*pq = append(*pq, item)
-}
-
-func (pq *priorityQueue) Pop() interface{} {
-	old := *pq
-	n := len(old)
-	item := old[n-1]
-	old[n-1] = nil
-	item.index = -1
-	*pq = old[0 : n-1]
-	return item
 }
