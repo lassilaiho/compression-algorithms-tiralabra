@@ -150,7 +150,7 @@ func buildCodeTree(freqs *frequencyTable) *codeTreeNode {
 	queue := priorityQueue{}
 	for symbol, freq := range freqs {
 		if freq > 0 {
-			queue = append(queue, &queueItem{
+			queue.Append(&queueItem{
 				node: &codeTreeNode{
 					symbol: byte(symbol),
 				},

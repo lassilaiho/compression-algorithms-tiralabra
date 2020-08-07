@@ -19,7 +19,7 @@ func (q *priorityQueue) Init() {
 // Push adds item to q.
 func (q *priorityQueue) Push(item *queueItem) {
 	node := len(*q)
-	*q = append(*q, item)
+	q.Append(item)
 	parent := (node - 1) / 2
 	for parent >= 0 && q.less(node, parent) {
 		q.swap(node, parent)
@@ -34,6 +34,24 @@ func (q *priorityQueue) Pop() *queueItem {
 	(*q) = (*q)[:len(*q)-1]
 	q.siftDown(0)
 	return item
+}
+
+// Append appends item to the end of q. The result may violate the heap
+// property. It must be restored with a call to Init.
+func (q *priorityQueue) Append(item *queueItem) {
+	if len(*q) == cap(*q) {
+		newCap := 2 * cap(*q)
+		if newCap == 0 {
+			newCap = 1
+		}
+		newQueue := make(priorityQueue, len(*q), newCap)
+		for i := 0; i < len(*q); i++ {
+			newQueue[i] = (*q)[i]
+		}
+		*q = newQueue
+	}
+	*q = (*q)[:len(*q)+1]
+	(*q)[len(*q)-1] = item
 }
 
 // Len returns the number of items in q.

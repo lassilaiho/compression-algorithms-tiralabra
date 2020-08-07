@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/slices"
 )
 
 // bitList is a growable packed list of bits. The zero value is an empty list
@@ -25,7 +26,7 @@ func newBitList(buf []byte) bitList {
 
 func (l *bitList) Append(bit bool) {
 	if l.len/8 >= len(l.buf) {
-		l.buf = append(l.buf, 0)
+		l.buf = slices.AppendBytes(l.buf, 0)
 	}
 	l.len++
 	l.Set(l.len-1, bit)

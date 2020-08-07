@@ -40,7 +40,7 @@ func TestPriorityQueue(t *testing.T) {
 	}
 	queue := priorityQueue{}
 	for i := 0; i < 10; i++ {
-		queue = append(queue, newItem())
+		queue.Append(newItem())
 	}
 	t.Run("Init", func(t *testing.T) {
 		logPriorityQueue(t, &queue)
