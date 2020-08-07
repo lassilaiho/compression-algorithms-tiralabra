@@ -1,9 +1,10 @@
 SUFFIX=
 
 GO=go
+GOLINT=golint
 OUTDIR=.
 
-.PHONY: all test clean huffmancmd lz77cmd
+.PHONY: all test clean huffmancmd lz77cmd lint
 
 all: huffmancmd lz77cmd
 
@@ -19,6 +20,10 @@ test:
 	  -coverpkg=./... \
 	  `go list -f '{{if ne .Name "main"}}{{.ImportPath}}{{end}}' ./...`
 	@go tool cover -func=cover.out | tail -1
+
+lint:
+	@$(GO) vet ./...
+	@$(GOLINT) ./...
 
 clean:
 	-rm $(OUTDIR)/huffmancmd $(OUTDIR)/lz77cmd $(OUTDIR)/cover.out

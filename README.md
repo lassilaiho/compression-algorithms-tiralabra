@@ -8,6 +8,9 @@ algoritmit" at the University of Helsinki.
 The compression programs can be built by running `make all` at the root of the
 repository.
 
+`make lint` runs `go vet` and `golint` on the project (requires golint to be
+installed and found in the path).
+
 `make test` executes unit tests and writes a test coverage report to
 `cover.out`. The report can be viewed by running
 ```
@@ -24,6 +27,7 @@ An online test coverage report can be found [here](codecov).
 
 - [Week 1](docs/weekly-report-1.md)
 - [Week 2](docs/weekly-report-2.md)
+- [Week 3](docs/weekly-report-3.md)
 
 
 <!-- Links -->
