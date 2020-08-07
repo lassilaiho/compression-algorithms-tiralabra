@@ -1,9 +1,10 @@
 package huffman
 
 import (
-	"bufio"
 	"io"
 	"strings"
+
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
 // bitList is a growable packed list of bits. The zero value is an empty list

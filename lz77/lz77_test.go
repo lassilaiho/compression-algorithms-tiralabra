@@ -1,11 +1,12 @@
 package lz77
 
 import (
-	"bufio"
 	"bytes"
 	"io/ioutil"
 	"strings"
 	"testing"
+
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
 func TestWindowBuffer(t *testing.T) {

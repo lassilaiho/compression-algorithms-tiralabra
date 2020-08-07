@@ -12,10 +12,11 @@ The output of Encode is formatted as follows:
 package huffman
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
 // Encode encodes all data from input using Huffman coding and writes the result

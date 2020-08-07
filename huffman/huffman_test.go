@@ -1,12 +1,13 @@
 package huffman
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
+
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
 func bitListOfBits(bits []byte) bitList {

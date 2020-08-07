@@ -9,10 +9,11 @@
 package lz77
 
 import (
-	"bufio"
 	"encoding/binary"
 	"errors"
 	"io"
+
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
 // These constants specify how the 16 bits of a
