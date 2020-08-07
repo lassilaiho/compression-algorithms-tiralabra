@@ -12,8 +12,6 @@ The output of Encode is formatted as follows:
 package huffman
 
 import (
-	"errors"
-	"fmt"
 	"io"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
@@ -82,7 +80,7 @@ func (table *codeTable) Encode(src *bufio.Reader, dst *bitWriter) error {
 	for {
 		b, err := src.ReadByte()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if err == io.EOF {
 				return dst.Flush()
 			}
 			return err
@@ -122,10 +120,10 @@ func countFrequencies(input *bufio.Reader, freqs *frequencyTable) error {
 	for {
 		b, err := input.ReadByte()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if err == io.EOF {
 				return nil
 			}
-			return fmt.Errorf("failed to count frequencies: %w", err)
+			return err
 		}
 		freqs[b]++
 	}

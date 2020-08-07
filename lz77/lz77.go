@@ -10,7 +10,6 @@ package lz77
 
 import (
 	"encoding/binary"
-	"errors"
 	"io"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
@@ -39,7 +38,7 @@ func Encode(input io.Reader, output io.Writer) error {
 	for {
 		lookahead, err := src.Peek(lookaheadBufferSize)
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
+			if err != io.EOF {
 				return err
 			}
 			if len(lookahead) == 0 {
@@ -62,7 +61,7 @@ func Encode(input io.Reader, output io.Writer) error {
 				panic(err)
 			}
 			if next, err = src.ReadByte(); err != nil {
-				if errors.Is(err, io.EOF) {
+				if err == io.EOF {
 					break
 				}
 				return err
@@ -86,7 +85,7 @@ func Decode(input io.Reader, output io.Writer) error {
 	for {
 		ref, err := decodeReference(src)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if err == io.EOF {
 				break
 			}
 			return err
@@ -98,7 +97,7 @@ func Decode(input io.Reader, output io.Writer) error {
 		}
 		next, err := src.ReadByte()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if err == io.EOF {
 				break
 			}
 			return err

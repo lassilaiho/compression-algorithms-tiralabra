@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"unsafe"
 )
@@ -25,6 +26,30 @@ func check(t *testing.T, expected, found interface{}) {
 	if expected != found {
 		t.Fatalf("expected %v, found %v", expected, found)
 	}
+}
+
+func (l *bitList) Equals(other bitList) bool {
+	if l.len != other.len {
+		return false
+	}
+	for i := 0; i < l.len; i++ {
+		if l.Get(i) != other.Get(i) {
+			return false
+		}
+	}
+	return true
+}
+
+func (l *bitList) String() string {
+	var b strings.Builder
+	for i := 0; i < l.len; i++ {
+		if l.Get(i) {
+			b.WriteRune('1')
+		} else {
+			b.WriteRune('0')
+		}
+	}
+	return b.String()
 }
 
 func TestBitReaderReadBit(t *testing.T) {

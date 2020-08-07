@@ -2,7 +2,6 @@ package huffman
 
 import (
 	"io"
-	"strings"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
@@ -61,30 +60,6 @@ func (l *bitList) Copy() bitList {
 	}
 	copy(copied.buf, l.buf)
 	return copied
-}
-
-func (l *bitList) Equals(other bitList) bool {
-	if l.len != other.len {
-		return false
-	}
-	for i := 0; i < l.len; i++ {
-		if l.Get(i) != other.Get(i) {
-			return false
-		}
-	}
-	return true
-}
-
-func (l *bitList) String() string {
-	var b strings.Builder
-	for i := 0; i < l.len; i++ {
-		if l.Get(i) {
-			b.WriteRune('1')
-		} else {
-			b.WriteRune('0')
-		}
-	}
-	return b.String()
 }
 
 // bitWriter is used to write individual bits into an io.Writer.
