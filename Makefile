@@ -14,9 +14,11 @@ lz77cmd:
 	$(GO) build -o $(OUTDIR)/lz77cmd ./cmd/lz77
 
 test:
-	$(GO) test \
-	  -cover `go list -f '{{if ne .Name "main"}} {{.ImportPath}} {{end}}' ./...` \
-	  -coverprofile cover.out
+	@$(GO) test \
+	  -coverprofile=cover.out \
+	  -coverpkg=./... \
+	  `go list -f '{{if ne .Name "main"}}{{.ImportPath}}{{end}}' ./...`
+	@go tool cover -func=cover.out | tail -1
 
 clean:
 	-rm $(OUTDIR)/huffmancmd $(OUTDIR)/lz77cmd $(OUTDIR)/cover.out
