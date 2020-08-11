@@ -17,7 +17,7 @@ installed and found in the path).
 go tool cover -html=cover.out
 ```
 
-An online test coverage report can be found [here](codecov).
+An online test coverage report can be found [here](https://codecov.io/gh/lassilaiho/compression-algorithms-tiralabra).
 
 ## Documentation
 
@@ -28,7 +28,3 @@ An online test coverage report can be found [here](codecov).
 - [Week 1](docs/weekly-report-1.md)
 - [Week 2](docs/weekly-report-2.md)
 - [Week 3](docs/weekly-report-3.md)
-
-
-<!-- Links -->
-[codecov]: https://codecov.io/gh/lassilaiho/compression-algorithms-tiralabra
