@@ -2,22 +2,21 @@ package bits
 
 import (
 	"io"
-	"strings"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/slices"
 )
 
-// List is a growable packed list of bits. The zero value is an empty list
-// ready for use.
+// List is a growable packed list of bits. The zero value is an empty list ready
+// for use.
 type List struct {
 	len int
 	buf []byte
 }
 
-// NewList returns a list that uses buf for it's initial contents. The
-// returned list takes ownership of buf and it shouldn't be used after passing
-// it to this function.
+// NewList returns a list that uses buf for it's initial contents. The returned
+// list takes ownership of buf and it shouldn't be used after passing it to this
+// function.
 func NewList(buf []byte) List {
 	return List{
 		len: 8 * len(buf),
@@ -25,6 +24,7 @@ func NewList(buf []byte) List {
 	}
 }
 
+// Append appends bit to l.
 func (l *List) Append(bit bool) {
 	if l.len/8 >= len(l.buf) {
 		l.buf = slices.AppendBytes(l.buf, 0)
@@ -33,10 +33,12 @@ func (l *List) Append(bit bool) {
 	l.Set(l.len-1, bit)
 }
 
+// Get returns the i'th bit in l. i must be in range [0, l.Len()).
 func (l *List) Get(i int) bool {
 	return (l.buf[i/8]>>(7-i%8))&1 != 0
 }
 
+// Set sets the i'th bit to bit. i must be in range [0, l.Len()).
 func (l *List) Set(i int, bit bool) {
 	if bit {
 		l.buf[i/8] |= 1 << byte(7-i%8)
@@ -45,16 +47,18 @@ func (l *List) Set(i int, bit bool) {
 	}
 }
 
+// Len returns the number of bits stored in l.
 func (l *List) Len() int {
 	return l.len
 }
 
-// Shrink shirnks the length of l by n. n must be in range [0, l.Len()). Shrink
+// Shrink shirnks the length of l by n. n must be in range [0, l.Len()]. Shrink
 // only reduces the length of l. No memory is freed.
 func (l *List) Shrink(n int) {
 	l.len -= n
 }
 
+// Copy returns a deep copy of l.
 func (l *List) Copy() List {
 	copied := List{
 		len: l.len,
@@ -64,23 +68,24 @@ func (l *List) Copy() List {
 	return copied
 }
 
+// String returns the string representation of l.
 func (l *List) String() string {
-	var b strings.Builder
+	s := make([]byte, l.len)
 	for i := 0; i < l.len; i++ {
 		if l.Get(i) {
-			b.WriteRune('1')
+			s[i] = '1'
 		} else {
-			b.WriteRune('0')
+			s[i] = '0'
 		}
 	}
-	return b.String()
+	return string(s)
 }
 
 // Writer is used to write individual bits into an io.Writer.
 //
-// All writes to a Writer are buffered. Calling Flush writes all buffered
-// data to the underlying io.Writer along with possible additional trailing zero
-// bits to round the data to full bytes.
+// All writes to a Writer are buffered. Calling Flush writes all buffered data
+// to the underlying io.Writer along with possible additional trailing zero bits
+// to round the data to full bytes.
 type Writer struct {
 	w   *bufio.Writer
 	i   byte
@@ -92,6 +97,7 @@ func NewWriter(w io.Writer) *Writer {
 	return &Writer{w: bufio.NewWriter(w)}
 }
 
+// WriteBit writes a single bit to w.
 func (w *Writer) WriteBit(b bool) error {
 	if b {
 		w.buf |= 1 << (7 - w.i)
@@ -108,6 +114,7 @@ func (w *Writer) WriteBit(b bool) error {
 	return nil
 }
 
+// WriteBits writes all bits in bits to w.
 func (w *Writer) WriteBits(bits *List) error {
 	for i := 0; i < bits.Len(); i++ {
 		if err := w.WriteBit(bits.Get(i)); err != nil {
@@ -117,6 +124,7 @@ func (w *Writer) WriteBits(bits *List) error {
 	return nil
 }
 
+// WriteByte writes n to the writer.
 func (w *Writer) WriteByte(n byte) error {
 	bits := NewList([]byte{n})
 	return w.WriteBits(&bits)
@@ -137,6 +145,8 @@ func (w *Writer) WriteInt64(n int64) error {
 	return w.WriteBits(&bits)
 }
 
+// Flush writes all buffered data to the underlying writer along with possible
+// trailing zero bits to pad the result to full bytes.
 func (w *Writer) Flush() error {
 	if w.i > 0 {
 		if err := w.w.WriteByte(w.buf); err != nil {
@@ -163,21 +173,22 @@ func NewReader(r io.Reader) *Reader {
 	}
 }
 
-func (w *Reader) ReadBit() (bit bool, err error) {
-	if w.i == 8 {
-		w.buf, err = w.w.ReadByte()
+// ReadBit reads a single bit from r.
+func (r *Reader) ReadBit() (bit bool, err error) {
+	if r.i == 8 {
+		r.buf, err = r.w.ReadByte()
 		if err != nil {
 			return false, err
 		}
-		w.i = 0
+		r.i = 0
 	}
-	bit = (w.buf>>(7-w.i))&1 != 0
-	w.i++
+	bit = (r.buf>>(7-r.i))&1 != 0
+	r.i++
 	return bit, nil
 }
 
-func (w *Reader) readBitPanicing() byte {
-	bit, err := w.ReadBit()
+func (r *Reader) readBitPanicing() byte {
+	bit, err := r.ReadBit()
 	if err != nil {
 		panic(readBitErr(err))
 	}
@@ -187,7 +198,8 @@ func (w *Reader) readBitPanicing() byte {
 	return 0
 }
 
-func (w *Reader) ReadByte() (byt byte, err error) {
+// ReadByte reads a byte from r.
+func (r *Reader) ReadByte() (byt byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(readBitErr); ok {
@@ -197,22 +209,22 @@ func (w *Reader) ReadByte() (byt byte, err error) {
 			}
 		}
 	}()
-	return w.readBytePanicking(), nil
+	return r.readBytePanicking(), nil
 }
 
-func (w *Reader) readBytePanicking() byte {
-	return w.readBitPanicing()<<7 |
-		w.readBitPanicing()<<6 |
-		w.readBitPanicing()<<5 |
-		w.readBitPanicing()<<4 |
-		w.readBitPanicing()<<3 |
-		w.readBitPanicing()<<2 |
-		w.readBitPanicing()<<1 |
-		w.readBitPanicing()
+func (r *Reader) readBytePanicking() byte {
+	return r.readBitPanicing()<<7 |
+		r.readBitPanicing()<<6 |
+		r.readBitPanicing()<<5 |
+		r.readBitPanicing()<<4 |
+		r.readBitPanicing()<<3 |
+		r.readBitPanicing()<<2 |
+		r.readBitPanicing()<<1 |
+		r.readBitPanicing()
 }
 
 // ReadInt64 reads an int64 value in little-endian byte order.
-func (w *Reader) ReadInt64() (n int64, err error) {
+func (r *Reader) ReadInt64() (n int64, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(readBitErr); ok {
@@ -222,14 +234,14 @@ func (w *Reader) ReadInt64() (n int64, err error) {
 			}
 		}
 	}()
-	x := uint64(w.readBytePanicking()) |
-		uint64(w.readBytePanicking())<<8 |
-		uint64(w.readBytePanicking())<<16 |
-		uint64(w.readBytePanicking())<<24 |
-		uint64(w.readBytePanicking())<<32 |
-		uint64(w.readBytePanicking())<<40 |
-		uint64(w.readBytePanicking())<<48 |
-		uint64(w.readBytePanicking())<<56
+	x := uint64(r.readBytePanicking()) |
+		uint64(r.readBytePanicking())<<8 |
+		uint64(r.readBytePanicking())<<16 |
+		uint64(r.readBytePanicking())<<24 |
+		uint64(r.readBytePanicking())<<32 |
+		uint64(r.readBytePanicking())<<40 |
+		uint64(r.readBytePanicking())<<48 |
+		uint64(r.readBytePanicking())<<56
 	return int64(x), nil
 }
 
