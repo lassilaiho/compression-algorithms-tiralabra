@@ -1,22 +1,33 @@
-// Package lz77 implements LZ77 encoding and decoding.
-//
-// Encode encodes data into triplets (l, d, n) where l is the length of the
-// sequence of bytes this triplet refers to, d is the number of characters
-// behind the current position the sequence starts and n is the next byte after
-// the sequence ends. If length and distance are 0 the triplet doesn't refer to
-// anything and is considered a literal byte n. l and d are encoded together as
-// a little-endian 16 bit unit. n is a single byte.
+/*
+Package lz77 implements LZ77 encoding and decoding.
+
+Encode outputs data in blocks. A block starts with an 8-bit header and is
+followed by at most eight data units. At the end of the data stream there may be
+less than 8 units following a header. In this case the bits in the header
+without corresponding data units are meaningless.
+
+Each bit in the header specifies the type of the corresponding unit following
+the header. A 0-bit means the corresponding unit is a literal byte. A 1-bit
+means the corresponding unit is a reference to a previous location in the data
+stream.
+
+A reference is a pair (l, d) where l is the length of the referred byte sequence
+and d is the starting point of the sequence as an offset from the current
+position. References are encoded as unsigned 16-bit little-endian integers. The
+length part of the integer is 4 bits and the distance part takes the remaining
+12 bits.
+*/
 package lz77
 
 import (
-	"encoding/binary"
 	"io"
 
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bits"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
-// These constants specify how the 16 bits of a
-// reference are distributed between length and distance.
+// These constants specify how the 16 bits of a reference are distributed
+// between length and distance.
 const (
 	refLenBits  = 4
 	refDistBits = 12
@@ -32,80 +43,107 @@ const (
 // output.
 func Encode(input io.Reader, output io.Writer) error {
 	src := bufio.NewReaderSize(input, lookaheadBufferSize)
-	dst := bufio.NewWriter(output)
+	dst := bits.NewWriter(output)
 	window := newWindowBuffer(windowBufferSize)
+	headerBuf := make([]byte, 1)
+	units := make([]uint16, 0, 8)
 
 	for {
-		lookahead, err := src.Peek(lookaheadBufferSize)
-		if err != nil {
-			if err != io.EOF {
-				return err
-			}
-			if len(lookahead) == 0 {
-				break
-			}
-		}
-		var next byte
-		ref := window.findLongestPrefix(lookahead)
-		window.append(lookahead[:ref.length])
-		if err := ref.encode(dst); err != nil {
-			return err
-		}
-		if ref.length == 0 {
-			next = lookahead[0]
-			if _, err := src.Discard(1); err != nil {
-				panic(err)
-			}
-		} else {
-			if _, err := src.Discard(int(ref.length)); err != nil {
-				panic(err)
-			}
-			if next, err = src.ReadByte(); err != nil {
-				if err == io.EOF {
+		headerBuf[0] = 0
+		unitHeader := bits.NewList(headerBuf)
+		units = units[:0]
+		for i := 0; i < cap(units); i++ {
+			lookahead, err := src.Peek(lookaheadBufferSize)
+			if err != nil {
+				if err != io.EOF {
+					return err
+				}
+				if len(lookahead) == 0 {
 					break
 				}
-				return err
+			}
+			ref := window.findLongestPrefix(lookahead)
+			if ref.length == 0 {
+				unitHeader.Set(i, false)
+				next, err := src.ReadByte()
+				if err != nil {
+					return err
+				}
+				units = append(units, uint16(next))
+				window.appendByte(next)
+			} else {
+				unitHeader.Set(i, true)
+				units = append(units, ref.asUint16())
+				window.append(lookahead[:ref.length])
+				if _, err := src.Discard(int(ref.length)); err != nil {
+					panic(err)
+				}
 			}
 		}
-		if err := dst.WriteByte(next); err != nil {
+		if len(units) == 0 {
+			break
+		}
+		if err := dst.WriteBits(&unitHeader); err != nil {
 			return err
 		}
-		window.appendByte(next)
+		for i := 0; i < len(units); i++ {
+			if unitHeader.Get(i) {
+				if err := dst.WriteUint16(units[i]); err != nil {
+					return err
+				}
+			} else {
+				if err := dst.WriteByte(byte(units[i])); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	return dst.Flush()
 }
 
 // Decode reads LZ77 encoded data from input, decodes it and writes the decoded
 // data to output.
-func Decode(input io.Reader, output io.Writer) error {
-	src := bufio.NewReaderSize(input, lookaheadBufferSize)
+func Decode(input io.Reader, output io.Writer) (err error) {
+	src := bits.NewReader(input)
 	dst := bufio.NewWriter(output)
 	window := newWindowBuffer(windowBufferSize)
+	headerBuf := make([]byte, 1)
 
 	for {
-		ref, err := decodeReference(src)
+		headerBuf[0], err = src.ReadByte()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return err
 		}
-		if ref.length != 0 {
-			if err := window.expandReference(dst, ref); err != nil {
-				return err
+		header := bits.NewList(headerBuf)
+		for i := 0; i < header.Len(); i++ {
+			if header.Get(i) {
+				ref, err := decodeReference(src)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					return err
+				}
+				if err := window.expandReference(dst, ref); err != nil {
+					return err
+				}
+			} else {
+				next, err := src.ReadByte()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					return err
+				}
+				if err := dst.WriteByte(next); err != nil {
+					return err
+				}
+				window.appendByte(next)
 			}
 		}
-		next, err := src.ReadByte()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		if err := dst.WriteByte(next); err != nil {
-			return err
-		}
-		window.appendByte(next)
 	}
 	return dst.Flush()
 }
@@ -116,16 +154,15 @@ type reference struct {
 	length, distance uint16
 }
 
-// encode encodes r to w as a single uint16 with little-endian byte order.
-func (r reference) encode(w io.Writer) error {
-	ref := (r.length << refDistBits) | r.distance
-	return binary.Write(w, binary.LittleEndian, ref)
+// asUint16 combines length and reference into a single uint16 value.
+func (r reference) asUint16() uint16 {
+	return (r.length << refDistBits) | r.distance
 }
 
 // decodeReference decodes a single reference from r.
-func decodeReference(r io.Reader) (reference, error) {
-	var ref uint16
-	if err := binary.Read(r, binary.LittleEndian, &ref); err != nil {
+func decodeReference(r *bits.Reader) (reference, error) {
+	ref, err := r.ReadUint16()
+	if err != nil {
 		return reference{}, err
 	}
 	return reference{

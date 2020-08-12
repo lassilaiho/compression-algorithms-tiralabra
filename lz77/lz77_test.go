@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bits"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
@@ -71,16 +72,19 @@ func TestReference(t *testing.T) {
 		length:   0b1000,
 		distance: 0b100111100110,
 	}
-	var encoded bytes.Buffer
-	t.Run("Encode", func(t *testing.T) {
-		expected := []byte{0b11100110, 0b10001001}
-		ref.encode(&encoded)
-		if !bytes.Equal(expected, encoded.Bytes()) {
-			t.Fatalf("expected %v, found %v", expected, encoded.Bytes())
+	t.Run("AsUint16", func(t *testing.T) {
+		expected := uint16(0b10001001_11100110)
+		found := ref.asUint16()
+		if found != expected {
+			t.Fatalf("expected %v, found %v", expected, found)
 		}
 	})
+	var encoded bytes.Buffer
+	w := bits.NewWriter(&encoded)
+	w.WriteUint16(ref.asUint16())
+	w.Flush()
 	t.Run("Decode", func(t *testing.T) {
-		decoded, _ := decodeReference(&encoded)
+		decoded, _ := decodeReference(bits.NewReader(&encoded))
 		if decoded != ref {
 			t.Fatalf("expected %v, found %v", ref, decoded)
 		}

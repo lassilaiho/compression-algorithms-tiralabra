@@ -87,6 +87,18 @@ func TestBitReaderReadInt64(t *testing.T) {
 	expectEOF(t, err)
 }
 
+func TestBitReaderReadUint16(t *testing.T) {
+	correct := uint16(19174)
+	input := make([]byte, unsafe.Sizeof(correct))
+	binary.LittleEndian.PutUint16(input, correct)
+	r := NewReader(bytes.NewBuffer(input))
+	found, err := r.ReadUint16()
+	expectNil(t, err)
+	check(t, correct, found)
+	_, err = r.ReadUint16()
+	expectEOF(t, err)
+}
+
 func TestBitWriterWriteBit(t *testing.T) {
 	input := []byte{
 		0, 0, 0, 1, 0, 1, 1, 0,
@@ -141,6 +153,15 @@ func TestBitWriterWriteInt64(t *testing.T) {
 	expectNil(t, w.WriteInt64(correct))
 	expectNil(t, w.Flush())
 	check(t, correct, int64(binary.LittleEndian.Uint64(output.Bytes())))
+}
+
+func TestBitWriterWriteUint16(t *testing.T) {
+	correct := uint16(7914)
+	var output bytes.Buffer
+	w := NewWriter(&output)
+	expectNil(t, w.WriteUint16(correct))
+	expectNil(t, w.Flush())
+	check(t, correct, binary.LittleEndian.Uint16(output.Bytes()))
 }
 
 func TestBitListSet(t *testing.T) {

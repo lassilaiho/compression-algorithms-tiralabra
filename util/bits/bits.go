@@ -145,6 +145,15 @@ func (w *Writer) WriteInt64(n int64) error {
 	return w.WriteBits(&bits)
 }
 
+// WriteUint16 writes n to the writer using little-endian byte order.
+func (w *Writer) WriteUint16(n uint16) error {
+	bits := NewList([]byte{
+		byte(n),
+		byte(n >> 8),
+	})
+	return w.WriteBits(&bits)
+}
+
 // Flush writes all buffered data to the underlying writer along with possible
 // trailing zero bits to pad the result to full bytes.
 func (w *Writer) Flush() error {
@@ -243,6 +252,22 @@ func (r *Reader) ReadInt64() (n int64, err error) {
 		uint64(r.readBytePanicking())<<48 |
 		uint64(r.readBytePanicking())<<56
 	return int64(x), nil
+}
+
+// ReadUint16 reads an uint16 value in little-endian byte order.
+func (r *Reader) ReadUint16() (n uint16, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if e, ok := r.(readBitErr); ok {
+				err = e
+			} else {
+				panic(r)
+			}
+		}
+	}()
+	x := uint16(r.readBytePanicking()) |
+		uint16(r.readBytePanicking())<<8
+	return x, nil
 }
 
 // readBitErr is used to differentiate panics caused by panicking variants of
