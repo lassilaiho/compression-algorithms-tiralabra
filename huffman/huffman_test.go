@@ -2,20 +2,33 @@ package huffman
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
 
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bits"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
-func bitListOfBits(bits []byte) bitList {
-	list := newBitList([]byte{})
-	for _, bit := range bits {
-		list.Append(bit != 0)
+func expectNil(t *testing.T, a interface{}) {
+	if a != nil {
+		t.Fatalf("expected nil, got %v", a)
 	}
-	return list
+}
+
+func expectEOF(t *testing.T, err error) {
+	if !errors.Is(err, io.EOF) {
+		t.Fatalf("expected io.EOF, got %v", err)
+	}
+}
+
+func check(t *testing.T, expected, found interface{}) {
+	if expected != found {
+		t.Fatalf("expected %v, found %v", expected, found)
+	}
 }
 
 func printTree(t *testing.T, node *codeTreeNode, indent string) {
@@ -70,32 +83,32 @@ func TestEncoding(t *testing.T) {
 		t.Log("5:", codeTable['5'].String())
 		t.Log("6:", codeTable['6'].String())
 
-		check(t, true, codeTable['1'].Equals(bitListOfBits([]byte{1, 1, 1})))
-		check(t, true, codeTable['2'].Equals(bitListOfBits([]byte{1, 1, 0})))
-		check(t, true, codeTable['3'].Equals(bitListOfBits([]byte{1, 0, 1})))
-		check(t, true, codeTable['4'].Equals(bitListOfBits([]byte{0, 0})))
-		check(t, true, codeTable['5'].Equals(bitListOfBits([]byte{1, 0, 0})))
-		check(t, true, codeTable['6'].Equals(bitListOfBits([]byte{0, 1})))
+		check(t, "111", codeTable['1'].String())
+		check(t, "110", codeTable['2'].String())
+		check(t, "101", codeTable['3'].String())
+		check(t, "00", codeTable['4'].String())
+		check(t, "100", codeTable['5'].String())
+		check(t, "01", codeTable['6'].String())
 	})
 	t.Run("CodeTreeEncode", func(t *testing.T) {
 		var output bytes.Buffer
-		writer := newBitWriter(&output)
+		writer := bits.NewWriter(&output)
 		expectNil(t, codeTree.encodeTo(writer))
 		writer.Flush()
-		bits := newBitList(output.Bytes())
+		bitList := bits.NewList(output.Bytes())
 		check(t,
 			"0010011010010011011000100110101100110011010011001010011000100000",
-			bits.String())
+			bitList.String())
 	})
 	t.Run("CodeTableEncode", func(t *testing.T) {
 		var output bytes.Buffer
 		expectNil(t, codeTable.Encode(
 			bufio.NewReader(strings.NewReader(input)),
-			newBitWriter(&output)))
-		bits := newBitList(output.Bytes())
+			bits.NewWriter(&output)))
+		bitList := bits.NewList(output.Bytes())
 		check(t,
 			"0010001110111101100000111011001111100101001101110110010111001111001010010010101111001101110110100011101110000000",
-			bits.String())
+			bitList.String())
 	})
 }
 
@@ -103,7 +116,7 @@ func TestDecoding(t *testing.T) {
 	data := "45621354622615342165326143453614216346214"
 	var encodedData bytes.Buffer
 	expectNil(t, Encode(strings.NewReader(data), &encodedData))
-	input := newBitReader(&encodedData)
+	input := bits.NewReader(&encodedData)
 
 	var codeTree *codeTreeNode
 	var err error

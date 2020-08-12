@@ -1,11 +1,10 @@
-package huffman
+package bits
 
 import (
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
-	"strings"
 	"testing"
 	"unsafe"
 )
@@ -28,7 +27,7 @@ func check(t *testing.T, expected, found interface{}) {
 	}
 }
 
-func (l *bitList) Equals(other bitList) bool {
+func (l *List) Equals(other List) bool {
 	if l.len != other.len {
 		return false
 	}
@@ -40,18 +39,6 @@ func (l *bitList) Equals(other bitList) bool {
 	return true
 }
 
-func (l *bitList) String() string {
-	var b strings.Builder
-	for i := 0; i < l.len; i++ {
-		if l.Get(i) {
-			b.WriteRune('1')
-		} else {
-			b.WriteRune('0')
-		}
-	}
-	return b.String()
-}
-
 func TestBitReaderReadBit(t *testing.T) {
 	input := []byte{0b00010110, 0b11010010, 0b11010010}
 	output := []byte{
@@ -59,7 +46,7 @@ func TestBitReaderReadBit(t *testing.T) {
 		1, 1, 0, 1, 0, 0, 1, 0,
 		1, 1, 0, 1, 0, 0, 1, 0,
 	}
-	r := newBitReader(bytes.NewBuffer(input))
+	r := NewReader(bytes.NewBuffer(input))
 	var bit bool
 	var err error
 	for i := 0; i < len(output); i++ {
@@ -76,7 +63,7 @@ func TestBitReaderReadBit(t *testing.T) {
 
 func TestBitReaderReadByte(t *testing.T) {
 	input := []byte{0b00010110, 0b01010010, 0b11010010}
-	r := newBitReader(bytes.NewBuffer(input))
+	r := NewReader(bytes.NewBuffer(input))
 	for i := 0; i < len(input); i++ {
 		byt, err := r.ReadByte()
 		expectNil(t, err)
@@ -92,7 +79,7 @@ func TestBitReaderReadInt64(t *testing.T) {
 	correct := int64(192479821742174211)
 	input := make([]byte, unsafe.Sizeof(correct))
 	binary.LittleEndian.PutUint64(input, uint64(correct))
-	r := newBitReader(bytes.NewBuffer(input))
+	r := NewReader(bytes.NewBuffer(input))
 	found, err := r.ReadInt64()
 	expectNil(t, err)
 	check(t, correct, found)
@@ -108,7 +95,7 @@ func TestBitWriterWriteBit(t *testing.T) {
 	}
 	correctOutput := []byte{0b00010110, 0b11010010, 0b11010010}
 	var output bytes.Buffer
-	w := newBitWriter(&output)
+	w := NewWriter(&output)
 	for _, bit := range input {
 		expectNil(t, w.WriteBit(bit != 0))
 	}
@@ -128,9 +115,9 @@ func TestBitWriterWriteBit(t *testing.T) {
 
 func TestBitWriterWriteBits(t *testing.T) {
 	correctOutput := []byte{0b00010110, 0b11010010, 0b11010010}
-	input := newBitList(correctOutput)
+	input := NewList(correctOutput)
 	var output bytes.Buffer
-	w := newBitWriter(&output)
+	w := NewWriter(&output)
 	expectNil(t, w.WriteBits(&input))
 	expectNil(t, w.Flush())
 	t.Log(output.Bytes())
@@ -150,14 +137,14 @@ func TestBitWriterWriteBits(t *testing.T) {
 func TestBitWriterWriteInt64(t *testing.T) {
 	correct := int64(192479821742174211)
 	var output bytes.Buffer
-	w := newBitWriter(&output)
+	w := NewWriter(&output)
 	expectNil(t, w.WriteInt64(correct))
 	expectNil(t, w.Flush())
 	check(t, correct, int64(binary.LittleEndian.Uint64(output.Bytes())))
 }
 
 func TestBitListSet(t *testing.T) {
-	bits := newBitList([]byte{0, 0})
+	bits := NewList([]byte{0, 0})
 	bits.Set(3, true)
 	check(t, "0001000000000000", bits.String())
 	bits.Set(4, true)

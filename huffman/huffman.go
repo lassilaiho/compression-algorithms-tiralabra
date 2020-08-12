@@ -14,6 +14,7 @@ package huffman
 import (
 	"io"
 
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bits"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
@@ -32,7 +33,7 @@ func Encode(input io.ReadSeeker, output io.Writer) error {
 		return err
 	}
 	src.Reset(input)
-	dst := newBitWriter(output)
+	dst := bits.NewWriter(output)
 	tree := buildCodeTree(&freqs)
 	if tree == nil {
 		return io.EOF
@@ -50,7 +51,7 @@ func Encode(input io.ReadSeeker, output io.Writer) error {
 // Decode decodes data encoded using Encode from input and writes the unencoded
 // data to output.
 func Decode(input io.Reader, output io.Writer) error {
-	src := newBitReader(input)
+	src := bits.NewReader(input)
 	dst := bufio.NewWriter(output)
 	codeTree, err := decodeCodeTree(src)
 	if err != nil {
@@ -73,10 +74,10 @@ func Decode(input io.Reader, output io.Writer) error {
 }
 
 // codeTable maps byte values to Huffman codes.
-type codeTable [256]bitList
+type codeTable [256]bits.List
 
 // Encode encodes all data in src using table and writes the result to dst.
-func (table *codeTable) Encode(src *bufio.Reader, dst *bitWriter) error {
+func (table *codeTable) Encode(src *bufio.Reader, dst *bits.Writer) error {
 	for {
 		b, err := src.ReadByte()
 		if err != nil {
@@ -94,12 +95,12 @@ func (table *codeTable) Encode(src *bufio.Reader, dst *bitWriter) error {
 // newCodeTable constructs the codeTable corresponding codeTree.
 func newCodeTable(codeTree *codeTreeNode) *codeTable {
 	table := &codeTable{}
-	code := bitList{}
+	code := bits.List{}
 	buildCodeTable(table, &code, codeTree)
 	return table
 }
 
-func buildCodeTable(table *codeTable, code *bitList, codeTree *codeTreeNode) {
+func buildCodeTable(table *codeTable, code *bits.List, codeTree *codeTreeNode) {
 	if codeTree.left == nil {
 		table[codeTree.symbol] = code.Copy()
 		return
@@ -177,7 +178,7 @@ func buildCodeTree(freqs *frequencyTable) *codeTreeNode {
 }
 
 // encodeTo encodes tree and writes the result to out.
-func (tree *codeTreeNode) encodeTo(out *bitWriter) error {
+func (tree *codeTreeNode) encodeTo(out *bits.Writer) error {
 	if tree.left == nil {
 		if err := out.WriteBit(true); err != nil {
 			return err
@@ -195,7 +196,7 @@ func (tree *codeTreeNode) encodeTo(out *bitWriter) error {
 
 // decodeCodeTree decodes a code tree from src that was previously encoded using
 // encodeTo.
-func decodeCodeTree(src *bitReader) (*codeTreeNode, error) {
+func decodeCodeTree(src *bits.Reader) (*codeTreeNode, error) {
 	bit, err := src.ReadBit()
 	if err != nil {
 		return nil, err
@@ -219,7 +220,7 @@ func decodeCodeTree(src *bitReader) (*codeTreeNode, error) {
 }
 
 // readCode reads a code from src and returns the corresponding byte value.
-func (tree *codeTreeNode) readCode(src *bitReader) (byte, error) {
+func (tree *codeTreeNode) readCode(src *bits.Reader) (byte, error) {
 	if tree.left == nil {
 		return tree.symbol, nil
 	}

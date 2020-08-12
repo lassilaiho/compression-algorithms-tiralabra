@@ -1,30 +1,31 @@
-package huffman
+package bits
 
 import (
 	"io"
+	"strings"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/slices"
 )
 
-// bitList is a growable packed list of bits. The zero value is an empty list
+// List is a growable packed list of bits. The zero value is an empty list
 // ready for use.
-type bitList struct {
+type List struct {
 	len int
 	buf []byte
 }
 
-// newBitList returns a list that uses buf for it's initial contents. The
+// NewList returns a list that uses buf for it's initial contents. The
 // returned list takes ownership of buf and it shouldn't be used after passing
 // it to this function.
-func newBitList(buf []byte) bitList {
-	return bitList{
+func NewList(buf []byte) List {
+	return List{
 		len: 8 * len(buf),
 		buf: buf,
 	}
 }
 
-func (l *bitList) Append(bit bool) {
+func (l *List) Append(bit bool) {
 	if l.len/8 >= len(l.buf) {
 		l.buf = slices.AppendBytes(l.buf, 0)
 	}
@@ -32,11 +33,11 @@ func (l *bitList) Append(bit bool) {
 	l.Set(l.len-1, bit)
 }
 
-func (l *bitList) Get(i int) bool {
+func (l *List) Get(i int) bool {
 	return (l.buf[i/8]>>(7-i%8))&1 != 0
 }
 
-func (l *bitList) Set(i int, bit bool) {
+func (l *List) Set(i int, bit bool) {
 	if bit {
 		l.buf[i/8] |= 1 << byte(7-i%8)
 	} else {
@@ -44,18 +45,18 @@ func (l *bitList) Set(i int, bit bool) {
 	}
 }
 
-func (l *bitList) Len() int {
+func (l *List) Len() int {
 	return l.len
 }
 
 // Shrink shirnks the length of l by n. n must be in range [0, l.Len()). Shrink
 // only reduces the length of l. No memory is freed.
-func (l *bitList) Shrink(n int) {
+func (l *List) Shrink(n int) {
 	l.len -= n
 }
 
-func (l *bitList) Copy() bitList {
-	copied := bitList{
+func (l *List) Copy() List {
+	copied := List{
 		len: l.len,
 		buf: make([]byte, len(l.buf)),
 	}
@@ -63,23 +64,35 @@ func (l *bitList) Copy() bitList {
 	return copied
 }
 
-// bitWriter is used to write individual bits into an io.Writer.
+func (l *List) String() string {
+	var b strings.Builder
+	for i := 0; i < l.len; i++ {
+		if l.Get(i) {
+			b.WriteRune('1')
+		} else {
+			b.WriteRune('0')
+		}
+	}
+	return b.String()
+}
+
+// Writer is used to write individual bits into an io.Writer.
 //
-// All writes to a bitWriter are buffered. Calling Flush writes all buffered
+// All writes to a Writer are buffered. Calling Flush writes all buffered
 // data to the underlying io.Writer along with possible additional trailing zero
 // bits to round the data to full bytes.
-type bitWriter struct {
+type Writer struct {
 	w   *bufio.Writer
 	i   byte
 	buf byte
 }
 
-// newBitWriter returns a bitWriter that writes to w.
-func newBitWriter(w io.Writer) *bitWriter {
-	return &bitWriter{w: bufio.NewWriter(w)}
+// NewWriter returns a bitWriter that writes to w.
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{w: bufio.NewWriter(w)}
 }
 
-func (w *bitWriter) WriteBit(b bool) error {
+func (w *Writer) WriteBit(b bool) error {
 	if b {
 		w.buf |= 1 << (7 - w.i)
 	}
@@ -95,7 +108,7 @@ func (w *bitWriter) WriteBit(b bool) error {
 	return nil
 }
 
-func (w *bitWriter) WriteBits(bits *bitList) error {
+func (w *Writer) WriteBits(bits *List) error {
 	for i := 0; i < bits.Len(); i++ {
 		if err := w.WriteBit(bits.Get(i)); err != nil {
 			return err
@@ -104,14 +117,14 @@ func (w *bitWriter) WriteBits(bits *bitList) error {
 	return nil
 }
 
-func (w *bitWriter) WriteByte(n byte) error {
-	bits := newBitList([]byte{n})
+func (w *Writer) WriteByte(n byte) error {
+	bits := NewList([]byte{n})
 	return w.WriteBits(&bits)
 }
 
 // WriteInt64 writes n to the writer using little-endian byte order.
-func (w *bitWriter) WriteInt64(n int64) error {
-	bits := newBitList([]byte{
+func (w *Writer) WriteInt64(n int64) error {
+	bits := NewList([]byte{
 		byte(uint64(n)),
 		byte(uint64(n) >> 8),
 		byte(uint64(n) >> 16),
@@ -124,7 +137,7 @@ func (w *bitWriter) WriteInt64(n int64) error {
 	return w.WriteBits(&bits)
 }
 
-func (w *bitWriter) Flush() error {
+func (w *Writer) Flush() error {
 	if w.i > 0 {
 		if err := w.w.WriteByte(w.buf); err != nil {
 			return err
@@ -135,22 +148,22 @@ func (w *bitWriter) Flush() error {
 	return w.w.Flush()
 }
 
-// bitReader is used to read individual bits from an io.Reader.
-type bitReader struct {
+// Reader is used to read individual bits from an io.Reader.
+type Reader struct {
 	w   *bufio.Reader
 	i   byte
 	buf byte
 }
 
-// newBitReader returns a bitReader that reads from r.
-func newBitReader(r io.Reader) *bitReader {
-	return &bitReader{
+// NewReader returns a bitReader that reads from r.
+func NewReader(r io.Reader) *Reader {
+	return &Reader{
 		w: bufio.NewReader(r),
 		i: 8,
 	}
 }
 
-func (w *bitReader) ReadBit() (bit bool, err error) {
+func (w *Reader) ReadBit() (bit bool, err error) {
 	if w.i == 8 {
 		w.buf, err = w.w.ReadByte()
 		if err != nil {
@@ -163,7 +176,7 @@ func (w *bitReader) ReadBit() (bit bool, err error) {
 	return bit, nil
 }
 
-func (w *bitReader) readBitPanicing() byte {
+func (w *Reader) readBitPanicing() byte {
 	bit, err := w.ReadBit()
 	if err != nil {
 		panic(readBitErr(err))
@@ -174,7 +187,7 @@ func (w *bitReader) readBitPanicing() byte {
 	return 0
 }
 
-func (w *bitReader) ReadByte() (byt byte, err error) {
+func (w *Reader) ReadByte() (byt byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(readBitErr); ok {
@@ -187,7 +200,7 @@ func (w *bitReader) ReadByte() (byt byte, err error) {
 	return w.readBytePanicking(), nil
 }
 
-func (w *bitReader) readBytePanicking() byte {
+func (w *Reader) readBytePanicking() byte {
 	return w.readBitPanicing()<<7 |
 		w.readBitPanicing()<<6 |
 		w.readBitPanicing()<<5 |
@@ -199,7 +212,7 @@ func (w *bitReader) readBytePanicking() byte {
 }
 
 // ReadInt64 reads an int64 value in little-endian byte order.
-func (w *bitReader) ReadInt64() (n int64, err error) {
+func (w *Reader) ReadInt64() (n int64, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(readBitErr); ok {
