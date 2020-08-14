@@ -1,7 +1,11 @@
 // Package bufio implements parts of the standard library package "bufio".
 package bufio
 
-import "io"
+import (
+	"io"
+
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/slices"
+)
 
 // defaultBufSize is the default size in bytes of the buffer for Reader and
 // Writer.
@@ -40,7 +44,7 @@ func NewReaderSize(rd io.Reader, size int) *Reader {
 func (r *Reader) Read(p []byte) (total int, err error) {
 	goal := len(p)
 	for {
-		n := copy(p, r.buf[r.next:r.end])
+		n := slices.CopyBytes(p, r.buf[r.next:r.end])
 		total += n
 		r.next += n
 		if total == goal {
@@ -105,7 +109,7 @@ func (r *Reader) Peek(n int) (buf []byte, err error) {
 		return r.buf[r.next:r.end], err
 	}
 	if r.next != 0 {
-		copy(r.buf, r.buf[r.next:r.end])
+		slices.CopyBytes(r.buf, r.buf[r.next:r.end])
 		r.end -= r.next
 		r.next = 0
 	}
@@ -143,7 +147,7 @@ func NewWriter(wr io.Writer) *Writer {
 func (w *Writer) Write(p []byte) (total int, err error) {
 	goal := len(p)
 	for {
-		n := copy(w.buf[w.end:], p)
+		n := slices.CopyBytes(w.buf[w.end:], p)
 		w.end += n
 		total += n
 		if total == goal {

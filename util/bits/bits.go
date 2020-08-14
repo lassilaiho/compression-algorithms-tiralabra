@@ -64,7 +64,7 @@ func (l *List) Copy() List {
 		len: l.len,
 		buf: make([]byte, len(l.buf)),
 	}
-	copy(copied.buf, l.buf)
+	slices.CopyBytes(copied.buf, l.buf)
 	return copied
 }
 

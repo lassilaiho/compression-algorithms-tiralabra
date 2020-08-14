@@ -24,6 +24,7 @@ import (
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bits"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
+	"github.com/lassilaiho/compression-algorithms-tiralabra/util/slices"
 )
 
 // These constants specify how the 16 bits of a reference are distributed
@@ -69,11 +70,11 @@ func Encode(input io.Reader, output io.Writer) error {
 				if err != nil {
 					return err
 				}
-				units = append(units, uint16(next))
+				units = slices.AppendUint16(units, uint16(next))
 				window.appendByte(next)
 			} else {
 				unitHeader.Set(i, true)
-				units = append(units, ref.asUint16())
+				units = slices.AppendUint16(units, ref.asUint16())
 				window.append(lookahead[:ref.length])
 				if _, err := src.Discard(int(ref.length)); err != nil {
 					panic(err)
@@ -204,9 +205,9 @@ func (w *windowBuffer) append(data []byte) {
 	}
 
 	// Copy data to buffer.
-	copied := copy(w.buf[w.start:], data)
+	copied := slices.CopyBytes(w.buf[w.start:], data)
 	if copied < len(data) {
-		copy(w.buf, data[copied:])
+		slices.CopyBytes(w.buf, data[copied:])
 	}
 	w.start = (w.start + len(data)) % len(w.buf)
 
