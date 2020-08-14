@@ -174,39 +174,70 @@ func decodeReference(r *bits.Reader) (reference, error) {
 // windowBuffer is a sliding window that keeps track of recent processed bytes
 // to allow replacing future duplicate byte sequences with references.
 type windowBuffer struct {
-	// Contains recent bytes
+	// Contains recent bytes.
 	buf []byte
 	// An index to buf which determines where the window logically starts.
 	start int
+	// A dictionary used to speed up prefix matching performance.
+	dict dictionary
+	// A monotonically increasing counter representing the current position in
+	// the data stream.
+	pos int64
 }
 
 // newWindowBuffer returns a windowBuffer with the specified size.
 func newWindowBuffer(size int) *windowBuffer {
-	return &windowBuffer{buf: make([]byte, size)}
+	return &windowBuffer{
+		buf:  make([]byte, size),
+		dict: dictionary{},
+		pos:  int64(size),
+	}
 }
 
 // append copies bytes in data to the end of the window while discarding an
 // equal amount of bytes from the beginning of the window.
 func (w *windowBuffer) append(data []byte) {
+	// Remove discarded byte sequences from dictionary.
+	w.pos += int64(len(data))
+	for i := 0; i < len(data); i++ {
+		w.dict.removeLesserThan(w.dictKey(i), w.pos-int64(len(w.buf))+int64(i))
+	}
+
+	// Copy data to buffer.
 	copied := copy(w.buf[w.start:], data)
 	if copied < len(data) {
 		copy(w.buf, data[copied:])
 	}
 	w.start = (w.start + len(data)) % len(w.buf)
+
+	// Add new byte sequences to dictionary.
+	pos := w.pos - dictKeySize - int64(len(data)) + 1
+	bufIndex := len(w.buf) - dictKeySize - len(data) + 1
+	if bufIndex < 0 {
+		pos -= int64(bufIndex)
+		bufIndex = 0
+	}
+	for i := 0; i < len(data); i++ {
+		w.dict.add(w.dictKey(bufIndex+i), pos+int64(i))
+	}
 }
 
 // appendByte is similar to append but for a single byte.
 func (w *windowBuffer) appendByte(b byte) {
-	w.buf[w.start] = b
-	w.start = (w.start + 1) % len(w.buf)
+	w.append([]byte{b})
 }
 
 // findLongestPrefix returns a reference to the longest prefix of input found in
 // the current window. A zeroed reference is returned if no prefix is found.
 func (w *windowBuffer) findLongestPrefix(input []byte) reference {
+	if len(input) < 2 {
+		return reference{}
+	}
 	start := 0
 	length := 0
-	for i := 0; i < len(w.buf); i++ {
+	value := w.dict.get(dictKey{input[0], input[1]})
+	for value != nil {
+		i := int(value.value) - (int(w.pos) - len(w.buf))
 		j := 0
 		for ; j < len(input) && i+j < len(w.buf); j++ {
 			if w.get(i+j) != input[j] {
@@ -217,6 +248,7 @@ func (w *windowBuffer) findLongestPrefix(input []byte) reference {
 			start = i
 			length = j
 		}
+		value = value.next
 	}
 	if length == 0 {
 		return reference{}
@@ -244,4 +276,83 @@ func (w *windowBuffer) expandReference(out *bufio.Writer, ref reference) error {
 // get returns the byte at logical index i in the window.
 func (w *windowBuffer) get(i int) byte {
 	return w.buf[(w.start+i)%len(w.buf)]
+}
+
+// dictKey returns the dictionary key corresponding to logical position i in the
+// window.
+func (w *windowBuffer) dictKey(i int) dictKey {
+	key := dictKey{}
+	for j := 0; j < len(key); j++ {
+		key[j] = w.get(i + j)
+	}
+	return key
+}
+
+const dictKeySize = 2
+
+type dictKey [dictKeySize]byte
+
+type dictEntry struct {
+	first *dictValue
+	last  *dictValue
+}
+
+type dictValue struct {
+	value int64
+	next  *dictValue
+}
+
+// dictionary maps keys into byte sequence positions in a data stream.
+//
+// A key is formed from the initial bytes of the sequence. The number of bytes
+// used is specified using the constant dictKeySize. Sequences shorter than this
+// can't be stored in the dictionary.
+//
+// Each key maps to a single entry. An entry is a linked list of values. The
+// values in a entry must be added in ascending order. The addition order is not
+// enforced. It is the caller's responsibility to add values in the correct
+// order.
+type dictionary map[dictKey]*dictEntry
+
+// add adds value to the end of the entry corresponding to key.
+func (d dictionary) add(key dictKey, value int64) {
+	entry := d[key]
+	if entry == nil {
+		entry = &dictEntry{}
+		d[key] = entry
+	}
+	if entry.first == nil {
+		entry.first = &dictValue{value: value}
+		entry.last = entry.first
+	} else {
+		entry.last.next = &dictValue{value: value}
+		entry.last = entry.last.next
+	}
+}
+
+// get returns the first value corresponding to key or nil if the entry
+// corresponding to key has no values.
+func (d dictionary) get(key dictKey) *dictValue {
+	entry := d[key]
+	if entry == nil {
+		return nil
+	}
+	return entry.first
+}
+
+// removeLesserThan removes all values lesser to value from the entry
+// corresponding to key.
+func (d dictionary) removeLesserThan(key dictKey, value int64) {
+	entry := d[key]
+	if entry == nil {
+		return
+	}
+	dictValue := entry.first
+	for dictValue != nil && dictValue.value < value {
+		dictValue = dictValue.next
+	}
+	entry.first = dictValue
+	if dictValue == nil {
+		entry.last = nil
+	}
 }
