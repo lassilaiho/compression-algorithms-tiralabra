@@ -25,6 +25,8 @@ An online test coverage report can be found [here](https://codecov.io/gh/lassila
 
 [Implementation document](docs/implementation.md)
 
+[Testing document](docs/testing.md)
+
 ## Weekly reports
 
 - [Week 1](docs/weekly-report-1.md)
