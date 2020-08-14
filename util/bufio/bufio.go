@@ -71,7 +71,7 @@ func (r *Reader) ReadByte() (byte, error) {
 // Reset discards all buffered data and resets r to read from rd.
 func (r *Reader) Reset(rd io.Reader) {
 	r.rd = rd
-	for i := range r.buf {
+	for i := 0; i < len(r.buf); i++ {
 		r.buf[i] = 0
 	}
 	r.next = 0

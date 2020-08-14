@@ -133,8 +133,8 @@ func countFrequencies(input *bufio.Reader, freqs *frequencyTable) error {
 // byteCount returns the total size in bytes of the data represnted by t.
 func (t *frequencyTable) byteCount() int64 {
 	var n int64
-	for _, x := range *t {
-		n += x
+	for i := 0; i < len(t); i++ {
+		n += t[i]
 	}
 	return n
 }
@@ -149,7 +149,8 @@ type codeTreeNode struct {
 // buildCodeTree builds a code tree using freqs.
 func buildCodeTree(freqs *frequencyTable) *codeTreeNode {
 	queue := priorityQueue{}
-	for symbol, freq := range freqs {
+	for symbol := 0; symbol < len(freqs); symbol++ {
+		freq := freqs[symbol]
 		if freq > 0 {
 			queue.Append(&queueItem{
 				node: &codeTreeNode{
