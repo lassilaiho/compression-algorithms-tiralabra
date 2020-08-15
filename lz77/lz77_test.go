@@ -57,8 +57,8 @@ func checkDict(t *testing.T, found, expected dictionary) {
 	}
 }
 
-func TestWindowBuffer(t *testing.T) {
-	window := newWindowBuffer(4)
+func TestEncoderWindowBuffer(t *testing.T) {
+	window := newEncoderWindowBuffer(4)
 	t.Run("Append", func(t *testing.T) {
 		window.append([]byte{4, 9, 1})
 		for i, b := range []byte{0, 4, 9, 1} {
@@ -106,7 +106,7 @@ func TestWindowBuffer(t *testing.T) {
 		expected := reference{length: 2, distance: 3}
 		ref := window.findLongestPrefix([]byte{1, 3})
 		if ref != expected {
-			for i := range window.buf {
+			for i := range window.win.buf {
 				fmt.Print(window.get(i), " ")
 			}
 			fmt.Println()
@@ -126,7 +126,7 @@ func TestWindowBuffer(t *testing.T) {
 	t.Run("ExpandReference", func(t *testing.T) {
 		var buf bytes.Buffer
 		w := bufio.NewWriter(&buf)
-		window.expandReference(w, reference{
+		window.win.expandReference(w, reference{
 			length:   3,
 			distance: 4,
 		})

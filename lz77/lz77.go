@@ -45,7 +45,7 @@ const (
 func Encode(input io.Reader, output io.Writer) error {
 	src := bufio.NewReaderSize(input, lookaheadBufferSize)
 	dst := bits.NewWriter(output)
-	window := newWindowBuffer(windowBufferSize)
+	window := newEncoderWindowBuffer(windowBufferSize)
 	headerBuf := make([]byte, 1)
 	units := make([]uint16, 0, 8)
 
@@ -179,85 +179,26 @@ type windowBuffer struct {
 	buf []byte
 	// An index to buf which determines where the window logically starts.
 	start int
-	// A dictionary used to speed up prefix matching performance.
-	dict dictionary
-	// A monotonically increasing counter representing the current position in
-	// the data stream.
-	pos int64
 }
 
 // newWindowBuffer returns a windowBuffer with the specified size.
 func newWindowBuffer(size int) *windowBuffer {
-	return &windowBuffer{
-		buf:  make([]byte, size),
-		dict: dictionary{},
-		pos:  int64(size),
-	}
+	return &windowBuffer{buf: make([]byte, size)}
 }
 
 // append copies bytes in data to the end of the window while discarding an
 // equal amount of bytes from the beginning of the window.
 func (w *windowBuffer) append(data []byte) {
-	// Remove discarded byte sequences from dictionary.
-	w.pos += int64(len(data))
-	for i := 0; i < len(data); i++ {
-		w.dict.removeLesserThan(w.dictKey(i), w.pos-int64(len(w.buf))+int64(i))
-	}
-
-	// Copy data to buffer.
 	copied := slices.CopyBytes(w.buf[w.start:], data)
 	if copied < len(data) {
 		slices.CopyBytes(w.buf, data[copied:])
 	}
 	w.start = (w.start + len(data)) % len(w.buf)
-
-	// Add new byte sequences to dictionary.
-	pos := w.pos - dictKeySize - int64(len(data)) + 1
-	bufIndex := len(w.buf) - dictKeySize - len(data) + 1
-	if bufIndex < 0 {
-		pos -= int64(bufIndex)
-		bufIndex = 0
-	}
-	for i := 0; i < len(data); i++ {
-		w.dict.add(w.dictKey(bufIndex+i), pos+int64(i))
-	}
 }
 
 // appendByte is similar to append but for a single byte.
 func (w *windowBuffer) appendByte(b byte) {
 	w.append([]byte{b})
-}
-
-// findLongestPrefix returns a reference to the longest prefix of input found in
-// the current window. A zeroed reference is returned if no prefix is found.
-func (w *windowBuffer) findLongestPrefix(input []byte) reference {
-	if len(input) < 2 {
-		return reference{}
-	}
-	start := 0
-	length := 0
-	value := w.dict.get(dictKey{input[0], input[1]})
-	for value != nil {
-		i := int(value.value) - (int(w.pos) - len(w.buf))
-		j := 0
-		for ; j < len(input) && i+j < len(w.buf); j++ {
-			if w.get(i+j) != input[j] {
-				break
-			}
-		}
-		if j > length {
-			start = i
-			length = j
-		}
-		value = value.next
-	}
-	if length == 0 {
-		return reference{}
-	}
-	return reference{
-		length:   uint16(length),
-		distance: uint16(len(w.buf) - start),
-	}
 }
 
 // expandReference expands ref by writing the corresponding byte sequence in the
@@ -279,9 +220,95 @@ func (w *windowBuffer) get(i int) byte {
 	return w.buf[(w.start+i)%len(w.buf)]
 }
 
+type encoderWindowBuffer struct {
+	win windowBuffer
+	// A dictionary used to speed up prefix matching performance.
+	dict dictionary
+	// A monotonically increasing counter representing the current position in
+	// the data stream.
+	pos int64
+}
+
+// newEncoderWindowBuffer returns an encoderWindowBuffer with the specified
+// size.
+func newEncoderWindowBuffer(size int) *encoderWindowBuffer {
+	return &encoderWindowBuffer{
+		win:  windowBuffer{buf: make([]byte, size)},
+		dict: dictionary{},
+		pos:  int64(size),
+	}
+}
+
+// append copies bytes in data to the end of the window while discarding an
+// equal amount of bytes from the beginning of the window.
+func (w *encoderWindowBuffer) append(data []byte) {
+	// Remove discarded byte sequences from dictionary.
+	w.pos += int64(len(data))
+	for i := 0; i < len(data); i++ {
+		pos := w.pos - int64(len(w.win.buf)) + int64(i)
+		w.dict.removeLesserThan(w.dictKey(i), pos)
+	}
+
+	// Copy data to buffer.
+	w.win.append(data)
+
+	// Add new byte sequences to dictionary.
+	pos := w.pos - dictKeySize - int64(len(data)) + 1
+	bufIndex := len(w.win.buf) - dictKeySize - len(data) + 1
+	if bufIndex < 0 {
+		pos -= int64(bufIndex)
+		bufIndex = 0
+	}
+	for i := 0; i < len(data); i++ {
+		w.dict.add(w.dictKey(bufIndex+i), pos+int64(i))
+	}
+}
+
+// appendByte is similar to append but for a single byte.
+func (w *encoderWindowBuffer) appendByte(b byte) {
+	w.append([]byte{b})
+}
+
+// findLongestPrefix returns a reference to the longest prefix of input found in
+// the current window. A zeroed reference is returned if no prefix is found.
+func (w *encoderWindowBuffer) findLongestPrefix(input []byte) reference {
+	if len(input) < 2 {
+		return reference{}
+	}
+	start := 0
+	length := 0
+	value := w.dict.get(dictKey{input[0], input[1]})
+	for value != nil {
+		i := int(value.value) - (int(w.pos) - len(w.win.buf))
+		j := 0
+		for ; j < len(input) && i+j < len(w.win.buf); j++ {
+			if w.get(i+j) != input[j] {
+				break
+			}
+		}
+		if j > length {
+			start = i
+			length = j
+		}
+		value = value.next
+	}
+	if length == 0 {
+		return reference{}
+	}
+	return reference{
+		length:   uint16(length),
+		distance: uint16(len(w.win.buf) - start),
+	}
+}
+
+// get returns the byte at logical index i in the window.
+func (w *encoderWindowBuffer) get(i int) byte {
+	return w.win.get(i)
+}
+
 // dictKey returns the dictionary key corresponding to logical position i in the
 // window.
-func (w *windowBuffer) dictKey(i int) dictKey {
+func (w *encoderWindowBuffer) dictKey(i int) dictKey {
 	key := dictKey{}
 	for j := 0; j < len(key); j++ {
 		key[j] = w.get(i + j)
