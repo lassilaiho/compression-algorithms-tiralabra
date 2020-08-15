@@ -3,38 +3,23 @@ package lz77
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"testing"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bits"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
+	tu "github.com/lassilaiho/compression-algorithms-tiralabra/util/testutil"
 )
 
 const (
 	testKalevala = "../test/kalevala.txt"
 )
 
-func readFile(filename string) []byte {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		panic(err)
-	}
-	return data
-}
-
-func check(t *testing.T, found, expected interface{}) {
-	t.Helper()
-	if found != expected {
-		t.Fatalf("expected %v, found %v", expected, found)
-	}
-}
-
 func checkDictValue(t *testing.T, found, expected *dictValue) {
 	t.Helper()
 	if expected == nil && found == nil {
 		return
 	} else if expected != nil && found != nil {
-		check(t, found.value, expected.value)
+		tu.Check(t, expected.value, found.value)
 		checkDictValue(t, found.next, expected.next)
 	} else {
 		t.Fatalf("expected %v, found %v", expected, found)
@@ -67,7 +52,7 @@ func TestEncoderWindowBuffer(t *testing.T) {
 					i, b, window.get(i))
 			}
 		}
-		check(t, window.pos, int64(7))
+		tu.Check(t, int64(7), window.pos)
 		checkDict(t, window.dict, dictionary{
 			dictKey{0, 4}: &dictEntry{
 				first: &dictValue{value: 3},
@@ -87,7 +72,7 @@ func TestEncoderWindowBuffer(t *testing.T) {
 					i, b, window.get(i))
 			}
 		}
-		check(t, window.pos, int64(9))
+		tu.Check(t, int64(9), window.pos)
 		checkDict(t, window.dict, dictionary{
 			dictKey{0, 4}: &dictEntry{},
 			dictKey{4, 9}: &dictEntry{},
@@ -114,14 +99,10 @@ func TestEncoderWindowBuffer(t *testing.T) {
 		}
 		expected = reference{length: 0, distance: 0}
 		ref = window.findLongestPrefix([]byte{0, 1})
-		if ref != expected {
-			t.Fatalf("expected %v, found %v", expected, ref)
-		}
+		tu.Check(t, expected, ref)
 		expected = reference{length: 2, distance: 3}
 		ref = window.findLongestPrefix([]byte{1, 3, 6})
-		if ref != expected {
-			t.Fatalf("expected %v, found %v", expected, ref)
-		}
+		tu.Check(t, expected, ref)
 	})
 	t.Run("ExpandReference", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -153,9 +134,7 @@ func TestReference(t *testing.T) {
 	t.Run("AsUint16", func(t *testing.T) {
 		expected := uint16(0b10001001_11100110)
 		found := ref.asUint16()
-		if found != expected {
-			t.Fatalf("expected %v, found %v", expected, found)
-		}
+		tu.Check(t, expected, found)
 	})
 	var encoded bytes.Buffer
 	w := bits.NewWriter(&encoded)
@@ -163,9 +142,7 @@ func TestReference(t *testing.T) {
 	w.Flush()
 	t.Run("Decode", func(t *testing.T) {
 		decoded, _ := decodeReference(bits.NewReader(&encoded))
-		if decoded != ref {
-			t.Fatalf("expected %v, found %v", ref, decoded)
-		}
+		tu.Check(t, ref, decoded)
 	})
 }
 
@@ -180,7 +157,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 		},
 		{
 			desc: "Kalevala",
-			data: readFile(testKalevala),
+			data: tu.ReadFile(testKalevala),
 		},
 	}
 	var encoded bytes.Buffer
@@ -207,7 +184,7 @@ func TestEncodingAndDecoding(t *testing.T) {
 }
 
 func BenchmarkEncode(b *testing.B) {
-	input := readFile(testKalevala)
+	input := tu.ReadFile(testKalevala)
 	r := bytes.NewReader(input)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

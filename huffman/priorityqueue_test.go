@@ -5,9 +5,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	tu "github.com/lassilaiho/compression-algorithms-tiralabra/util/testutil"
 )
 
 func validateHeapProperty(t *testing.T, q *priorityQueue, i int) {
+	t.Helper()
 	left := 2*i + 1
 	right := 2*i + 2
 	if left < q.Len() {
@@ -25,6 +28,7 @@ func validateHeapProperty(t *testing.T, q *priorityQueue, i int) {
 }
 
 func logPriorityQueue(t *testing.T, q *priorityQueue) {
+	t.Helper()
 	b := strings.Builder{}
 	for _, item := range *q {
 		b.WriteString(strconv.FormatInt(item.frequency, 10))
@@ -56,13 +60,13 @@ func TestPriorityQueue(t *testing.T) {
 		queue.Push(newItem())
 		validateHeapProperty(t, &queue, 0)
 
-		check(t, int64(0), queue.Pop().frequency)
+		tu.Check(t, int64(0), queue.Pop().frequency)
 		validateHeapProperty(t, &queue, 0)
 		queue.Push(newItem())
 		validateHeapProperty(t, &queue, 0)
-		check(t, int64(2), queue.Pop().frequency)
+		tu.Check(t, int64(2), queue.Pop().frequency)
 		validateHeapProperty(t, &queue, 0)
-		check(t, int64(4), queue.Pop().frequency)
+		tu.Check(t, int64(4), queue.Pop().frequency)
 		validateHeapProperty(t, &queue, 0)
 	})
 }
