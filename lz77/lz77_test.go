@@ -4,12 +4,23 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"strings"
 	"testing"
 
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bits"
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
+
+const (
+	testKalevala = "../test/kalevala.txt"
+)
+
+func readFile(filename string) []byte {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
 
 func check(t *testing.T, found, expected interface{}) {
 	t.Helper()
@@ -159,26 +170,44 @@ func TestReference(t *testing.T) {
 }
 
 func TestEncodingAndDecoding(t *testing.T) {
-	input := "aösdkfjaöslkdfjaösldkjfaösldkjföalsdkjflaskjdhfakjsdflkdsajhfaksdjhflsakdjhf"
+	cases := []struct {
+		desc string
+		data []byte
+	}{
+		{
+			desc: "Random",
+			data: []byte("aösdkfjaöslkdfjaösldkjfaösldkjföalsdkjflaskjdhfakjsdflkdsajhfaksdjhflsakdjhf"),
+		},
+		{
+			desc: "Kalevala",
+			data: readFile(testKalevala),
+		},
+	}
 	var encoded bytes.Buffer
-	if err := Encode(strings.NewReader(input), &encoded); err != nil {
-		t.Fatal(err)
-	}
-	var decoded strings.Builder
-	if err := Decode(&encoded, &decoded); err != nil {
-		t.Fatal(err)
-	}
-	result := decoded.String()
-	if result != input {
-		t.Fatalf("expected %s, found %s", input, result)
+	var decoded bytes.Buffer
+	for _, c := range cases {
+		encoded.Reset()
+		decoded.Reset()
+		t.Run(c.desc, func(t *testing.T) {
+			if err := Encode(bytes.NewReader(c.data), &encoded); err != nil {
+				t.Fatal(err)
+			}
+			if err := Decode(&encoded, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(c.data, decoded.Bytes()) {
+				if len(c.data) < 200 {
+					t.Fatalf("expected %v, found %v", string(c.data), decoded.String())
+				} else {
+					t.FailNow()
+				}
+			}
+		})
 	}
 }
 
 func BenchmarkEncode(b *testing.B) {
-	input, err := ioutil.ReadFile("../test/kalevala.txt")
-	if err != nil {
-		b.Fatal(err)
-	}
+	input := readFile(testKalevala)
 	r := bytes.NewReader(input)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

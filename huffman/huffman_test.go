@@ -13,6 +13,18 @@ import (
 	"github.com/lassilaiho/compression-algorithms-tiralabra/util/bufio"
 )
 
+const (
+	testKalevala = "../test/kalevala.txt"
+)
+
+func readFile(filename string) []byte {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
+
 func expectNil(t *testing.T, a interface{}) {
 	if a != nil {
 		t.Fatalf("expected nil, got %v", a)
@@ -159,12 +171,36 @@ func TestDecoding(t *testing.T) {
 }
 
 func TestDecode(t *testing.T) {
-	input := "45621354622615342165326143453614216346214"
+	cases := []struct {
+		desc string
+		data []byte
+	}{
+		{
+			desc: "RandomNumbers",
+			data: []byte("45621354622615342165326143453614216346214"),
+		},
+		{
+			desc: "Kalevala",
+			data: readFile(testKalevala),
+		},
+	}
 	var buf bytes.Buffer
-	var output strings.Builder
-	expectNil(t, Encode(strings.NewReader(input), &buf))
-	expectNil(t, Decode(&buf, &output))
-	check(t, input, output.String())
+	var output bytes.Buffer
+	for _, c := range cases {
+		buf.Reset()
+		output.Reset()
+		t.Run(c.desc, func(t *testing.T) {
+			expectNil(t, Encode(bytes.NewReader(c.data), &buf))
+			expectNil(t, Decode(&buf, &output))
+			if !bytes.Equal(c.data, output.Bytes()) {
+				if len(c.data) < 200 {
+					t.Fatalf("expected %v, found %v", string(c.data), output.String())
+				} else {
+					t.FailNow()
+				}
+			}
+		})
+	}
 }
 
 func BenchmarkEncode(b *testing.B) {
