@@ -14,6 +14,23 @@ const (
 	testKalevala = "../test/kalevala.txt"
 )
 
+func (d *dictionary) forEach(t *testing.T, f func(*dictEntry)) {
+	t.Helper()
+	for _, bucket := range d.buckets {
+		for _, entry := range bucket {
+			f(entry)
+		}
+	}
+}
+
+func newDictOf(entries ...*dictEntry) *dictionary {
+	dict := newDictionary()
+	for _, e := range entries {
+		dict.setEntry(e)
+	}
+	return dict
+}
+
 func checkDictValue(t *testing.T, found, expected *dictValue) {
 	t.Helper()
 	if expected == nil && found == nil {
@@ -26,20 +43,20 @@ func checkDictValue(t *testing.T, found, expected *dictValue) {
 	}
 }
 
-func checkDict(t *testing.T, found, expected dictionary) {
+func checkDict(t *testing.T, found, expected *dictionary) {
 	t.Helper()
-	for key, eentry := range expected {
-		fentry := found[key]
+	expected.forEach(t, func(eentry *dictEntry) {
+		t.Helper()
+		key := eentry.key
+		fentry := found.get(key)
 		if eentry == nil && fentry == nil {
-			continue
+			return
 		} else if eentry != nil && fentry != nil {
-			evalue := eentry.first
-			fvalue := found[key].first
-			checkDictValue(t, fvalue, evalue)
+			checkDictValue(t, found.get(key), eentry.first)
 		} else {
 			t.Fatalf("expected %v, found %v", eentry, fentry)
 		}
-	}
+	})
 }
 
 func TestEncoderWindowBuffer(t *testing.T) {
@@ -53,17 +70,20 @@ func TestEncoderWindowBuffer(t *testing.T) {
 			}
 		}
 		tu.Check(t, int64(7), window.pos)
-		checkDict(t, window.dict, dictionary{
-			dictKey{0, 4}: &dictEntry{
+		checkDict(t, window.dict, newDictOf(
+			&dictEntry{
+				key:   dictKey{0, 4},
 				first: &dictValue{value: 3},
 			},
-			dictKey{4, 9}: &dictEntry{
+			&dictEntry{
+				key:   dictKey{4, 9},
 				first: &dictValue{value: 4},
 			},
-			dictKey{9, 1}: &dictEntry{
+			&dictEntry{
+				key:   dictKey{9, 1},
 				first: &dictValue{value: 5},
 			},
-		})
+		))
 
 		window.append([]byte{3, 2})
 		for i, b := range []byte{9, 1, 3, 2} {
@@ -73,19 +93,20 @@ func TestEncoderWindowBuffer(t *testing.T) {
 			}
 		}
 		tu.Check(t, int64(9), window.pos)
-		checkDict(t, window.dict, dictionary{
-			dictKey{0, 4}: &dictEntry{},
-			dictKey{4, 9}: &dictEntry{},
-			dictKey{9, 1}: &dictEntry{
+		checkDict(t, window.dict, newDictOf(
+			&dictEntry{
+				key:   dictKey{9, 1},
 				first: &dictValue{value: 5},
 			},
-			dictKey{1, 3}: &dictEntry{
+			&dictEntry{
+				key:   dictKey{1, 3},
 				first: &dictValue{value: 6},
 			},
-			dictKey{3, 2}: &dictEntry{
+			&dictEntry{
+				key:   dictKey{3, 2},
 				first: &dictValue{value: 7},
 			},
-		})
+		))
 	})
 	t.Run("FindLongestPrefix", func(t *testing.T) {
 		expected := reference{length: 2, distance: 3}

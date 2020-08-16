@@ -223,7 +223,7 @@ func (w *windowBuffer) get(i int) byte {
 type encoderWindowBuffer struct {
 	win windowBuffer
 	// A dictionary used to speed up prefix matching performance.
-	dict dictionary
+	dict *dictionary
 	// A monotonically increasing counter representing the current position in
 	// the data stream.
 	pos int64
@@ -234,7 +234,7 @@ type encoderWindowBuffer struct {
 func newEncoderWindowBuffer(size int) *encoderWindowBuffer {
 	return &encoderWindowBuffer{
 		win:  windowBuffer{buf: make([]byte, size)},
-		dict: dictionary{},
+		dict: newDictionary(),
 		pos:  int64(size),
 	}
 }
@@ -272,12 +272,16 @@ func (w *encoderWindowBuffer) appendByte(b byte) {
 // findLongestPrefix returns a reference to the longest prefix of input found in
 // the current window. A zeroed reference is returned if no prefix is found.
 func (w *encoderWindowBuffer) findLongestPrefix(input []byte) reference {
-	if len(input) < 2 {
+	if len(input) < dictKeySize {
 		return reference{}
 	}
 	start := 0
 	length := 0
-	value := w.dict.get(dictKey{input[0], input[1]})
+	key := dictKey{}
+	for i := 0; i < dictKeySize; i++ {
+		key[i] = input[i]
+	}
+	value := w.dict.get(key)
 	for value != nil {
 		i := int(value.value) - (int(w.pos) - len(w.win.buf))
 		j := 0
@@ -314,73 +318,4 @@ func (w *encoderWindowBuffer) dictKey(i int) dictKey {
 		key[j] = w.get(i + j)
 	}
 	return key
-}
-
-const dictKeySize = 2
-
-type dictKey [dictKeySize]byte
-
-type dictEntry struct {
-	first *dictValue
-	last  *dictValue
-}
-
-type dictValue struct {
-	value int64
-	next  *dictValue
-}
-
-// dictionary maps keys into byte sequence positions in a data stream.
-//
-// A key is formed from the initial bytes of the sequence. The number of bytes
-// used is specified using the constant dictKeySize. Sequences shorter than this
-// can't be stored in the dictionary.
-//
-// Each key maps to a single entry. An entry is a linked list of values. The
-// values in a entry must be added in ascending order. The addition order is not
-// enforced. It is the caller's responsibility to add values in the correct
-// order.
-type dictionary map[dictKey]*dictEntry
-
-// add adds value to the end of the entry corresponding to key.
-func (d dictionary) add(key dictKey, value int64) {
-	entry := d[key]
-	if entry == nil {
-		entry = &dictEntry{}
-		d[key] = entry
-	}
-	if entry.first == nil {
-		entry.first = &dictValue{value: value}
-		entry.last = entry.first
-	} else {
-		entry.last.next = &dictValue{value: value}
-		entry.last = entry.last.next
-	}
-}
-
-// get returns the first value corresponding to key or nil if the entry
-// corresponding to key has no values.
-func (d dictionary) get(key dictKey) *dictValue {
-	entry := d[key]
-	if entry == nil {
-		return nil
-	}
-	return entry.first
-}
-
-// removeLesserThan removes all values lesser to value from the entry
-// corresponding to key.
-func (d dictionary) removeLesserThan(key dictKey, value int64) {
-	entry := d[key]
-	if entry == nil {
-		return
-	}
-	dictValue := entry.first
-	for dictValue != nil && dictValue.value < value {
-		dictValue = dictValue.next
-	}
-	entry.first = dictValue
-	if dictValue == nil {
-		entry.last = nil
-	}
 }
