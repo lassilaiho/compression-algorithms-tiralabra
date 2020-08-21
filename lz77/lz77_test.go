@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	testKalevala = "../test/kalevala.txt"
+	testKalevala = "../test/files/kalevala.txt"
 )
 
 func (d *dictionary) forEach(t *testing.T, f func(*dictEntry)) {

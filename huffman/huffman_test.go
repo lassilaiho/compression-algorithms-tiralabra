@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	testKalevala = "../test/kalevala.txt"
+	testKalevala = "../test/files/kalevala.txt"
 )
 
 func printTree(node *codeTreeNode, indent string) {
