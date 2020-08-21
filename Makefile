@@ -4,6 +4,8 @@ GO=go
 GOLINT=golint
 OUTDIR=.
 
+ITERATIONS=5
+
 .PHONY: all test clean huffmancmd lz77cmd lint
 
 all: huffmancmd lz77cmd
@@ -13,6 +15,23 @@ huffmancmd:
 
 lz77cmd:
 	$(GO) build -o $(OUTDIR)/lz77cmd ./cmd/lz77
+
+testrunner:
+	$(GO) build -o ./test/runner ./test/cmd
+
+report-data: huffmancmd lz77cmd testrunner
+	@./test/runner \
+	  -iters $(ITERATIONS) \
+	  -cmd $(OUTDIR)/huffmancmd \
+	  -workdir ./test/tmp \
+	  -dir ./test/files \
+	  > huffman-stats.csv
+	@./test/runner \
+	  -iters $(ITERATIONS) \
+	  -cmd $(OUTDIR)/lz77cmd \
+	  -workdir ./test/tmp \
+	  -dir ./test/files \
+	  > lz77-stats.csv
 
 test:
 	@$(GO) test \
@@ -26,4 +45,8 @@ lint:
 	@$(GOLINT) ./...
 
 clean:
-	-rm $(OUTDIR)/huffmancmd $(OUTDIR)/lz77cmd $(OUTDIR)/cover.out
+	-rm -r \
+	  $(OUTDIR)/huffmancmd \
+	  $(OUTDIR)/lz77cmd \
+	  ./test/runner \
+	  ./test/tmp

@@ -6,6 +6,9 @@
 *.out
 *.test
 
-*.huff
-*.lz77
-*.dec
+/test/*.huff
+/test/*.lz77
+/test/*.dec
+/test/tmp/
+/test/runner
+/*.csv
