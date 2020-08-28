@@ -41,19 +41,45 @@ func init() {
 	flag.Parse()
 }
 
-type testResult struct {
-	file               string
+type runResult struct {
 	averageTime        time.Duration
 	averageMaxMemUsage int
-	compressedSize     int
-	uncompressedSize   int
 }
 
-func timeCommand(result *testResult, cmd, inFile, outFile string) error {
-	c := exec.Command("time", "-f", "%e;%M", cmd, inFile, outFile)
+func (r *runResult) setAverage(iterations int) {
+	r.averageTime /= time.Duration(iterations)
+	r.averageMaxMemUsage /= iterations
+}
+
+func (r *runResult) averageTimeString() string {
+	return strconv.FormatFloat(float64(r.averageTime)/float64(time.Second), 'f', -1, 64)
+}
+
+type testResult struct {
+	file             string
+	compression      runResult
+	decompression    runResult
+	compressedSize   int
+	uncompressedSize int
+}
+
+type cmdTimeError struct {
+	output string
+	err    error
+}
+
+func (err *cmdTimeError) Error() string {
+	return err.err.Error() + ", output: " + err.output
+}
+
+func timeCommand(result *runResult, cmd ...string) error {
+	c := exec.Command("time", append([]string{"-f", "%e;%M"}, cmd...)...)
 	output, err := c.CombinedOutput()
 	if err != nil {
-		return err
+		return &cmdTimeError{
+			output: string(output),
+			err:    err,
+		}
 	}
 	parts := bytes.Split(output, []byte{';'})
 	if len(parts) < 2 {
@@ -73,6 +99,8 @@ func timeCommand(result *testResult, cmd, inFile, outFile string) error {
 }
 
 func runTest(command, inputFile, outputFile string, iterations int) (*testResult, error) {
+	compressionOut := outputFile + ".compressed"
+	decompressionOut := outputFile + ".decompressed"
 	stat, err := os.Stat(inputFile)
 	if err != nil {
 		return nil, err
@@ -82,18 +110,24 @@ func runTest(command, inputFile, outputFile string, iterations int) (*testResult
 		uncompressedSize: int(stat.Size()),
 	}
 	for i := 0; i < iterations; i++ {
-		err := timeCommand(t, command, inputFile, outputFile)
+		err := timeCommand(&t.compression, command, inputFile, compressionOut)
 		if err != nil {
 			return nil, err
 		}
 	}
-	stat, err = os.Stat(outputFile)
+	stat, err = os.Stat(compressionOut)
 	if err != nil {
 		return nil, err
 	}
 	t.compressedSize = int(stat.Size())
-	t.averageTime /= time.Duration(iterations)
-	t.averageMaxMemUsage /= iterations
+	t.compression.setAverage(iterations)
+	for i := 0; i < iterations; i++ {
+		err := timeCommand(&t.decompression, command, "-d", compressionOut, decompressionOut)
+		if err != nil {
+			return nil, err
+		}
+	}
+	t.decompression.setAverage(iterations)
 	return t, nil
 }
 
@@ -101,16 +135,20 @@ func printResults(results []*testResult) {
 	w := csv.NewWriter(os.Stdout)
 	w.Write([]string{
 		"File",
-		"Average execution time (s)",
-		"Avarege peak memory usage (B)",
+		"Average compression execution time (s)",
+		"Avarege compression peak memory usage (B)",
+		"Average decompression execution time (s)",
+		"Avarege decompression peak memory usage (B)",
 		"Uncompressed size (B)",
 		"Compressed size (B)",
 	})
 	for _, result := range results {
 		w.Write([]string{
 			result.file,
-			strconv.FormatFloat(float64(result.averageTime)/float64(time.Second), 'f', -1, 64),
-			strconv.Itoa(result.averageMaxMemUsage),
+			result.compression.averageTimeString(),
+			strconv.Itoa(result.compression.averageMaxMemUsage),
+			result.decompression.averageTimeString(),
+			strconv.Itoa(result.decompression.averageMaxMemUsage),
 			strconv.Itoa(result.uncompressedSize),
 			strconv.Itoa(result.compressedSize),
 		})
@@ -133,7 +171,6 @@ func run() error {
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return err
 	}
-	fmt.Fprintln(os.Stderr, workDir)
 	inputFiles, err := ioutil.ReadDir(inputDir)
 	if err != nil {
 		return err
@@ -143,10 +180,10 @@ func run() error {
 		if inputFile.IsDir() {
 			continue
 		}
-		fmt.Fprintln(os.Stderr, "Processing", inputFile.Name())
+		fmt.Fprintln(os.Stderr, "  Processing", inputFile.Name())
 
 		inputPath := filepath.Join(inputDir, inputFile.Name())
-		outputPath := filepath.Join(workDir, inputFile.Name()+".compressed")
+		outputPath := filepath.Join(workDir, inputFile.Name())
 		results[i], err = runTest(command, inputPath, outputPath, iterationCount)
 		if err != nil {
 			return err
