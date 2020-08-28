@@ -6,7 +6,7 @@ OUTDIR=.
 
 ITERATIONS=5
 
-.PHONY: all test clean huffmancmd lz77cmd lint
+.PHONY: all test clean huffmancmd lz77cmd lint testrunner perf-report
 
 all: huffmancmd lz77cmd
 
@@ -19,7 +19,7 @@ lz77cmd:
 testrunner:
 	$(GO) build -o ./test/runner ./test/cmd
 
-report-data: huffmancmd lz77cmd testrunner
+perf-report: huffmancmd lz77cmd testrunner
 	@./test/runner \
 	  -iters $(ITERATIONS) \
 	  -cmd $(OUTDIR)/huffmancmd \
