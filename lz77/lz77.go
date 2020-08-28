@@ -220,6 +220,8 @@ func (w *windowBuffer) get(i int) byte {
 	return w.buf[(w.start+i)%len(w.buf)]
 }
 
+// encoderWindowBuffer pairs a windowBuffer instance with a dictionary to
+// support finding longest prefixes of data in the window.
 type encoderWindowBuffer struct {
 	win windowBuffer
 	// A dictionary used to speed up prefix matching performance.

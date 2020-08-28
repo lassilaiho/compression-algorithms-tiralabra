@@ -1,3 +1,4 @@
+// Package bits implements types and functions for handling individual bits.
 package bits
 
 import (
@@ -52,8 +53,8 @@ func (l *List) Len() int {
 	return l.len
 }
 
-// Shrink shirnks the length of l by n. n must be in range [0, l.Len()]. Shrink
-// only reduces the length of l. No memory is freed.
+// Shrink shirnks the length of l by n bits. n must be in range [0, l.Len()].
+// Shrink only reduces the length of l. No memory is freed.
 func (l *List) Shrink(n int) {
 	l.len -= n
 }

@@ -59,6 +59,8 @@ func (q *priorityQueue) Len() int {
 	return len(*q)
 }
 
+// siftDown moves node downward in the heap until it satisfies the heap
+// property.
 func (q *priorityQueue) siftDown(node int) {
 	for {
 		min := node
@@ -78,10 +80,13 @@ func (q *priorityQueue) siftDown(node int) {
 	}
 }
 
+// swap swaps the elements at positions i and j.
 func (q *priorityQueue) swap(i, j int) {
 	(*q)[i], (*q)[j] = (*q)[j], (*q)[i]
 }
 
+// less returns true if the frequency of the i'th element is less than that of
+// the j'th element and false otherwise.
 func (q *priorityQueue) less(i, j int) bool {
 	return (*q)[i].frequency < (*q)[j].frequency
 }

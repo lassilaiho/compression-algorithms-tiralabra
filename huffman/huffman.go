@@ -100,6 +100,8 @@ func newCodeTable(codeTree *codeTreeNode) *codeTable {
 	return table
 }
 
+// buildCodeTable fills table with codes from codeTree. code is used for
+// constructing the codes and may be at least partially overwritten.
 func buildCodeTable(table *codeTable, code *bits.List, codeTree *codeTreeNode) {
 	if codeTree.left == nil {
 		table[codeTree.symbol] = code.Copy()
