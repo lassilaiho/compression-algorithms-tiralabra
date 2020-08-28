@@ -5,6 +5,8 @@ algoritmit" at the University of Helsinki.
 
 ## Building the project
 
+Go version 1.14 or later is required.
+
 The compression programs can be built by running `make all` at the root of the
 repository.
 
