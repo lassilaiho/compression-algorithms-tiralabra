@@ -112,7 +112,7 @@ func TestEncoderWindowBuffer(t *testing.T) {
 		expected := reference{length: 2, distance: 3}
 		ref := window.findLongestPrefix([]byte{1, 3})
 		if ref != expected {
-			for i := range window.win.buf {
+			for i := 0; i < window.win.size; i++ {
 				fmt.Print(window.get(i), " ")
 			}
 			fmt.Println()

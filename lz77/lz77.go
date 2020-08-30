@@ -44,7 +44,7 @@ const (
 // output.
 func Encode(input io.Reader, output io.Writer) error {
 	src := bufio.NewReaderSize(input, lookaheadBufferSize)
-	dst := bits.NewWriter(output)
+	dst := bufio.NewWriter(output)
 	window := newEncoderWindowBuffer(windowBufferSize)
 	headerBuf := make([]byte, 1)
 	units := make([]uint16, 0, 8)
@@ -84,12 +84,12 @@ func Encode(input io.Reader, output io.Writer) error {
 		if len(units) == 0 {
 			break
 		}
-		if err := dst.WriteBits(&unitHeader); err != nil {
+		if _, err := dst.Write(headerBuf); err != nil {
 			return err
 		}
 		for i := 0; i < len(units); i++ {
 			if unitHeader.Get(i) {
-				if err := dst.WriteUint16(units[i]); err != nil {
+				if err := writeUint16(dst, units[i]); err != nil {
 					return err
 				}
 			} else {
@@ -100,6 +100,13 @@ func Encode(input io.Reader, output io.Writer) error {
 		}
 	}
 	return dst.Flush()
+}
+
+// writeUint16 writes n to w in little-endian byte order.
+func writeUint16(w *bufio.Writer, n uint16) error {
+	data := [2]byte{byte(n), byte(n >> 8)}
+	_, err := w.Write(data[:])
+	return err
 }
 
 // Decode reads LZ77 encoded data from input, decodes it and writes the decoded
@@ -175,25 +182,33 @@ func decodeReference(r *bits.Reader) (reference, error) {
 // windowBuffer is a sliding window that keeps track of recent processed bytes
 // to allow replacing future duplicate byte sequences with references.
 type windowBuffer struct {
-	// Contains recent bytes.
+	// buf stores the data. It's size is larger than the size of the window so
+	// that moving data from the end of the window to the beginning can be done
+	// less often.
 	buf []byte
-	// An index to buf which determines where the window logically starts.
-	start int
+	// The byte range [start,start+size) in buf contains the current state of
+	// the window.
+	start, size int
 }
 
-// newWindowBuffer returns a windowBuffer with the specified size.
+// newWindowBuffer returns a windowBuffer capable of holding size bytes of
+// recent data.
 func newWindowBuffer(size int) *windowBuffer {
-	return &windowBuffer{buf: make([]byte, size)}
+	return &windowBuffer{
+		buf:  make([]byte, 4*size),
+		size: size,
+	}
 }
 
 // append copies bytes in data to the end of the window while discarding an
 // equal amount of bytes from the beginning of the window.
 func (w *windowBuffer) append(data []byte) {
-	copied := slices.CopyBytes(w.buf[w.start:], data)
-	if copied < len(data) {
-		slices.CopyBytes(w.buf, data[copied:])
+	if w.start+w.size+len(data) >= len(w.buf) {
+		slices.CopyBytes(w.buf, w.buf[w.start+len(data):w.start+w.size])
+		w.start = -len(data)
 	}
-	w.start = (w.start + len(data)) % len(w.buf)
+	slices.CopyBytes(w.buf[w.start+w.size:], data)
+	w.start += len(data)
 }
 
 // appendByte is similar to append but for a single byte.
@@ -204,7 +219,7 @@ func (w *windowBuffer) appendByte(b byte) {
 // expandReference expands ref by writing the corresponding byte sequence in the
 // window to out and the end of the window.
 func (w *windowBuffer) expandReference(out *bufio.Writer, ref reference) error {
-	start := len(w.buf) - int(ref.distance)
+	start := w.size - int(ref.distance)
 	for i := 0; i < int(ref.length); i++ {
 		byt := w.get(start)
 		if err := out.WriteByte(byt); err != nil {
@@ -217,13 +232,13 @@ func (w *windowBuffer) expandReference(out *bufio.Writer, ref reference) error {
 
 // get returns the byte at logical index i in the window.
 func (w *windowBuffer) get(i int) byte {
-	return w.buf[(w.start+i)%len(w.buf)]
+	return w.buf[w.start+i]
 }
 
 // encoderWindowBuffer pairs a windowBuffer instance with a dictionary to
 // support finding longest prefixes of data in the window.
 type encoderWindowBuffer struct {
-	win windowBuffer
+	win *windowBuffer
 	// A dictionary used to speed up prefix matching performance.
 	dict *dictionary
 	// A monotonically increasing counter representing the current position in
@@ -235,7 +250,7 @@ type encoderWindowBuffer struct {
 // size.
 func newEncoderWindowBuffer(size int) *encoderWindowBuffer {
 	return &encoderWindowBuffer{
-		win:  windowBuffer{buf: make([]byte, size)},
+		win:  newWindowBuffer(size),
 		dict: newDictionary(),
 		pos:  int64(size),
 	}
@@ -245,9 +260,8 @@ func newEncoderWindowBuffer(size int) *encoderWindowBuffer {
 // equal amount of bytes from the beginning of the window.
 func (w *encoderWindowBuffer) append(data []byte) {
 	// Remove discarded byte sequences from dictionary.
-	w.pos += int64(len(data))
 	for i := 0; i < len(data); i++ {
-		pos := w.pos - int64(len(w.win.buf)) + int64(i)
+		pos := w.pos - int64(w.win.size) + int64(i)
 		w.dict.removeLesserThan(w.dictKey(i), pos)
 	}
 
@@ -255,8 +269,9 @@ func (w *encoderWindowBuffer) append(data []byte) {
 	w.win.append(data)
 
 	// Add new byte sequences to dictionary.
+	w.pos += int64(len(data))
 	pos := w.pos - dictKeySize - int64(len(data)) + 1
-	bufIndex := len(w.win.buf) - dictKeySize - len(data) + 1
+	bufIndex := w.win.size - dictKeySize - len(data) + 1
 	if bufIndex < 0 {
 		pos -= int64(bufIndex)
 		bufIndex = 0
@@ -283,11 +298,12 @@ func (w *encoderWindowBuffer) findLongestPrefix(input []byte) reference {
 	for i := 0; i < dictKeySize; i++ {
 		key[i] = input[i]
 	}
+	w.dict.removeLesserThan(key, w.pos-int64(w.win.size))
 	value := w.dict.get(key)
 	for value != nil {
-		i := int(value.value) - (int(w.pos) - len(w.win.buf))
+		i := int(value.value) - (int(w.pos) - w.win.size)
 		j := 0
-		for ; j < len(input) && i+j < len(w.win.buf); j++ {
+		for ; j < len(input) && i+j < w.win.size; j++ {
 			if w.get(i+j) != input[j] {
 				break
 			}
@@ -303,7 +319,7 @@ func (w *encoderWindowBuffer) findLongestPrefix(input []byte) reference {
 	}
 	return reference{
 		length:   uint16(length),
-		distance: uint16(len(w.win.buf) - start),
+		distance: uint16(w.win.size - start),
 	}
 }
 

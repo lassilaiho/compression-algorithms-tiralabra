@@ -2,7 +2,7 @@ package lz77
 
 const (
 	// The maximum load factor allowed for a dictionary.
-	dictMaxLoadFactor = 0.75
+	dictMaxLoadFactor = 0.6
 	// The multiplier used when expanding dictionary bucket slice.
 	dictGrowthMultiplier = 2
 )
@@ -17,8 +17,8 @@ const (
 // be added in ascending order. The addition order is not enforced. It is the
 // caller's responsibility to add values in the correct order.
 type dictionary struct {
-	buckets   []dictBucket
-	itemCount int
+	buckets    []dictBucket
+	entryCount int
 }
 
 // newDictionary returns creates a new dictionary.
@@ -67,18 +67,19 @@ func (d *dictionary) removeLesserThan(key dictKey, value int64) {
 	}
 	if dictValue == nil {
 		d.getBucket(key).remove(key)
+		d.entryCount--
 	} else {
 		entry.first = dictValue
 	}
 }
 
-// setEntry sets adds entry to the dictionary. If an entry with the same key
-// already exists, it is overwritten with the new one.
+// setEntry adds entry to the dictionary. If an entry with the same key already
+// exists, it is overwritten with the new one.
 func (d *dictionary) setEntry(entry *dictEntry) {
 	bucket := d.getBucket(entry.key)
 	existing := bucket.get(entry.key)
 	if existing == nil {
-		d.itemCount++
+		d.entryCount++
 		bucket.add(entry)
 		if d.loadFactor() > dictMaxLoadFactor {
 			d.expand()
@@ -106,7 +107,7 @@ func (d *dictionary) getBucket(key dictKey) *dictBucket {
 
 // loadFactor returns the load factor of the dictionary.
 func (d *dictionary) loadFactor() float32 {
-	return float32(d.itemCount) / float32(len(d.buckets))
+	return float32(d.entryCount) / float32(len(d.buckets))
 }
 
 // expand adds buckets to the dictionary according to dictGrowthMultiplier.
@@ -134,7 +135,7 @@ type dictKey [dictKeySize]byte
 // hash returns the hash of the key.
 func (k dictKey) hash() uint {
 	const shiftSize = 5
-	const hashSize = 1024
+	const hashSize = 4096 * 2
 
 	hash := uint(0)
 	for i := 0; i < len(k); i++ {
