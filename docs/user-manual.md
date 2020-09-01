@@ -15,7 +15,7 @@ Both programs have a uniform user interface:
 ```
 program [flags] <input> <output>
 ```
-where \<input> is the input file, \<output> is the file the output is written
+where \<input> is the input file and \<output> is the file the output is written
 to. The default action is to compress \<input> and write the output to
 \<output>. Passing the `-d` flag switches the program to decompression mode. In
 decompression mode \<input> must be a file compressed using the same program.
@@ -25,10 +25,11 @@ flag which prints usage information to standard output.
 ## Performance report
 
 Running `make perf-report` generates a performance report for both programs. The
-output is written in CSV format to `huffman-stas.csv` and `lz77-stats.csv` for
-Huffman coding and LZ77, respectively. The report includes average compression
-and decompression time, peak memory usage as well as original and compressed
-file sizes for each test file in `test/files` directory.
+report requires GNU time to be available in the path. The output is written in
+CSV format to `huffman-stas.csv` and `lz77-stats.csv` for Huffman coding and
+LZ77, respectively. The report includes average compression and decompression
+time, peak memory usage as well as original and compressed file sizes for each
+test file in `test/files` directory.
 
 By default each test file is compressed and decompressed five times and the
 measured runtimes are averaged to improve accuracy. The number of iterations can
