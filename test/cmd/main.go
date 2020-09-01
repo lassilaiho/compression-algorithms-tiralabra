@@ -63,6 +63,10 @@ type testResult struct {
 	uncompressedSize int
 }
 
+func (r *testResult) spaceSavings() float64 {
+	return 1 - float64(r.compressedSize)/float64(r.uncompressedSize)
+}
+
 type cmdTimeError struct {
 	output string
 	err    error
@@ -136,11 +140,12 @@ func printResults(results []*testResult) {
 	w.Write([]string{
 		"File",
 		"Average compression execution time (s)",
-		"Avarege compression peak memory usage (B)",
+		"Average compression peak memory usage (B)",
 		"Average decompression execution time (s)",
-		"Avarege decompression peak memory usage (B)",
+		"Average decompression peak memory usage (B)",
 		"Uncompressed size (B)",
 		"Compressed size (B)",
+		"Space savings (%)",
 	})
 	for _, result := range results {
 		w.Write([]string{
@@ -151,6 +156,7 @@ func printResults(results []*testResult) {
 			strconv.Itoa(result.decompression.averageMaxMemUsage),
 			strconv.Itoa(result.uncompressedSize),
 			strconv.Itoa(result.compressedSize),
+			strconv.FormatFloat(result.spaceSavings(), 'f', -1, 64),
 		})
 	}
 	w.Flush()
