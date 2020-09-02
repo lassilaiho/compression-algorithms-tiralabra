@@ -148,6 +148,9 @@ func printResults(results []*testResult) {
 		"Space savings (%)",
 	})
 	for _, result := range results {
+		if result == nil {
+			continue
+		}
 		w.Write([]string{
 			result.file,
 			result.compression.averageTimeString(),
