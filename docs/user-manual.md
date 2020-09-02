@@ -20,4 +20,4 @@ to. The default action is to compress \<input> and write the output to
 \<output>. Passing the `-d` flag switches the program to decompression mode. In
 decompression mode \<input> must be a file compressed using the same program.
 The decompressed file is written to \<output>. Both programs support the `-help`
-flag which prints usage information to standard output.
+flag which prints usage information.
