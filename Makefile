@@ -6,7 +6,7 @@ OUTDIR=.
 
 ITERATIONS=5
 
-.PHONY: all test clean huffmancmd lz77cmd lint perftestrunner perf-report
+.PHONY: all test clean huffmancmd lz77cmd lint perftestrunner perf-report gendocs
 
 all: huffmancmd lz77cmd
 
@@ -32,6 +32,9 @@ perf-report: huffmancmd lz77cmd perftestrunner
 	  -workdir ./test/tmp \
 	  -dir ./test/files \
 	  > lz77-stats.csv
+
+gendocs:
+	$(GO) run ./tools/gendocs ./docs .
 
 test:
 	@$(GO) test \
