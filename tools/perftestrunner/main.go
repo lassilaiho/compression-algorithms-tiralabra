@@ -52,7 +52,7 @@ func (r *runResult) setAverage(iterations int) {
 }
 
 func (r *runResult) averageTimeString() string {
-	return strconv.FormatFloat(float64(r.averageTime)/float64(time.Second), 'f', -1, 64)
+	return strconv.FormatFloat(float64(r.averageTime)/float64(time.Second), 'f', 3, 64)
 }
 
 type testResult struct {
@@ -64,7 +64,7 @@ type testResult struct {
 }
 
 func (r *testResult) spaceSavings() float64 {
-	return 1 - float64(r.compressedSize)/float64(r.uncompressedSize)
+	return 100 * (1 - float64(r.compressedSize)/float64(r.uncompressedSize))
 }
 
 type cmdTimeError struct {
@@ -159,7 +159,7 @@ func printResults(results []*testResult) {
 			strconv.Itoa(result.decompression.averageMaxMemUsage),
 			strconv.Itoa(result.uncompressedSize),
 			strconv.Itoa(result.compressedSize),
-			strconv.FormatFloat(result.spaceSavings(), 'f', -1, 64),
+			strconv.FormatFloat(result.spaceSavings(), 'f', 2, 64),
 		})
 	}
 	w.Flush()

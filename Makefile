@@ -32,6 +32,18 @@ perf-report: huffmancmd lz77cmd perftestrunner
 	  -workdir ./test/tmp \
 	  -dir ./test/files \
 	  > lz77-stats.csv
+	@./test/runner \
+	  -iters $(ITERATIONS) \
+	  -cmd $(OUTDIR)/huffmancmd \
+	  -workdir ./test/tmp \
+	  -dir ./test/files/complexity-analysis \
+	  > huffman-complexity-stats.csv
+	@./test/runner \
+	  -iters $(ITERATIONS) \
+	  -cmd $(OUTDIR)/lz77cmd \
+	  -workdir ./test/tmp \
+	  -dir ./test/files/complexity-analysis \
+	  > lz77-complexity-stats.csv
 
 gendocs:
 	$(GO) run ./tools/gendocs ./docs .

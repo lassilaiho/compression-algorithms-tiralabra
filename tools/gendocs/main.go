@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -28,14 +31,85 @@ func init() {
 }
 
 type perfData struct {
-	Huffman, LZ77 [][]string
-
 	HuffmanTable, LZ77Table string
+
+	huffmanFile           string
+	lz77File              string
+	huffmanComplexityFile string
+	lz77ComplexityFile    string
+
+	graphDir   string
+	linkPrefix string
 }
 
-func (d *perfData) genTables() {
-	d.HuffmanTable = formatTable(d.Huffman)
-	d.LZ77Table = formatTable(d.LZ77)
+func loadPerfData(dataDir, graphDir, linkPrefix string) (*perfData, error) {
+	data := &perfData{
+		huffmanFile:           filepath.Join(dataDir, "huffman-stats.csv"),
+		lz77File:              filepath.Join(dataDir, "lz77-stats.csv"),
+		huffmanComplexityFile: filepath.Join(dataDir, "huffman-complexity-stats.csv"),
+		lz77ComplexityFile:    filepath.Join(dataDir, "lz77-complexity-stats.csv"),
+		graphDir:              graphDir,
+		linkPrefix:            linkPrefix,
+	}
+	huffmanData, err := readData(data.huffmanFile)
+	if err != nil {
+		return nil, err
+	}
+	lz77Data, err := readData(data.lz77File)
+	if err != nil {
+		return nil, err
+	}
+	data.HuffmanTable = formatTable(huffmanData)
+	data.LZ77Table = formatTable(lz77Data)
+	return data, nil
+}
+
+func (d *perfData) Gnuplot(graphName, commands string) (string, error) {
+	graphFileName := graphName + ".png"
+	graphFilePath := filepath.Join(d.graphDir, graphFileName)
+	var script bytes.Buffer
+	fmt.Fprintf(&script, `
+set datafile separator comma
+set grid
+set output '%s'
+set term png size 700,480
+`, graphFilePath)
+	script.WriteString(commands)
+
+	cmd := exec.Command("gnuplot",
+		"-e", "Huffman='"+d.huffmanFile+"'",
+		"-e", "LZ77='"+d.lz77File+"'",
+		"-e", "HuffmanComplexity='"+d.huffmanComplexityFile+"'",
+		"-e", "LZ77Complexity='"+d.lz77ComplexityFile+"'",
+		"-",
+	)
+	cmd.Stdin = &script
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to run gnuplot: %s", string(output))
+	}
+	return imageRef(graphName, path.Join(d.linkPrefix, graphFileName)), nil
+}
+
+func (d *perfData) generateDocument(t *template.Template, outFile string) error {
+	f, err := os.Create(outFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintf(f, `<!--
+    This file was automatically generated from "%s".
+    Any changes will be overwritten when the file is regenerated.
+-->
+`, t.Name())
+	if err != nil {
+		return err
+	}
+	return t.Execute(f, d)
+}
+
+func imageRef(name, path string) string {
+	return "![" + name + "](" + path + ")"
 }
 
 func repeat(s string, n int) []string {
@@ -86,29 +160,23 @@ func run() error {
 		return errors.New("expected 2 argument")
 	}
 	tmpldir := flag.Arg(0)
-	datadir := flag.Arg(1)
+	dataDir := flag.Arg(1)
 	tmpl, err := template.ParseGlob(filepath.Join(tmpldir, "*.template.md"))
 	if err != nil {
 		return err
 	}
-	var data perfData
-	data.Huffman, err = readData(filepath.Join(datadir, "huffman-stats.csv"))
+	imageDir := filepath.Join(tmpldir, "images")
+	if err := os.MkdirAll(imageDir, 0755); err != nil {
+		return err
+	}
+	data, err := loadPerfData(dataDir, imageDir, "images")
 	if err != nil {
 		return err
 	}
-	data.LZ77, err = readData(filepath.Join(datadir, "lz77-stats.csv"))
-	if err != nil {
-		return err
-	}
-	data.genTables()
 	for _, t := range tmpl.Templates() {
 		name := strings.TrimSuffix(t.Name(), ".template.md") + ".md"
-		f, err := os.Create(filepath.Join(tmpldir, name))
+		err := data.generateDocument(t, filepath.Join(tmpldir, name))
 		if err != nil {
-			return err
-		}
-		defer f.Close()
-		if err := t.Execute(f, &data); err != nil {
 			return err
 		}
 	}
