@@ -1,7 +1,3 @@
-<!--
-    This file was automatically generated from "implementation.template.md".
-    Any changes will be overwritten when the file is regenerated.
--->
 # Implementation document
 
 ## Project structure
@@ -99,9 +95,32 @@ is not used when decoding and the window takes relatively little space. This is
 why the memory usage of LZ77 decoding is about the same as for Huffman encoding
 and decoding.
 
-![execution-times](images/execution-times.png)
+{{ .Gnuplot "execution-times" `
+set title "Compression and decompression times"
+set xlabel "File size (B)"
+set ylabel "Execution time (s)"
+set key left top
+plot HuffmanComplexity using 6:2 skip 1 smooth unique title "Huffman coding compression", \
+  HuffmanComplexity using 6:4 skip 1 smooth unique title "Huffman coding decompression", \
+  LZ77Complexity using 6:2 skip 1 smooth unique title "LZ77 compression", \
+  LZ77Complexity using 6:4 skip 1 smooth unique title "LZ77 decompression"
+` }}
 
-![memory-usage](images/memory-usage.png)
+{{ .Gnuplot "memory-usage" `
+set title "Compression and decompression peak memory usage"
+set xlabel "File size (B)"
+set ylabel "Peak memory usage (B)"
+set key right center
+plot HuffmanComplexity using 6:3 skip 1 smooth unique title "Huffman coding compression", \
+  HuffmanComplexity using 6:5 skip 1 smooth unique title "Huffman coding decompression", \
+  LZ77Complexity using 6:3 skip 1 smooth unique title "LZ77 compression", \
+  LZ77Complexity using 6:5 skip 1 smooth unique title "LZ77 decompression"
+` }}
+
+## Possible improvements
+
+I didn't notice any bugs in either algorithm, but both can most likely be
+greatly optimized from their current state.
 
 ## Sources
 
