@@ -18,8 +18,15 @@ An online test coverage report can be found
 
 ## Performance testing
 
-Both algorithms were tested on a set of test files in `test/files`. The
-collection of files comprises text and binary files in various formats and
+There are two sets of test files: `test/files` and
+`test/files/complexity-analysis`. The first includes files of various types and
+sizes for comparing the overall performance of the algorithms. The latter file
+set is used specifically for time and space complexity analysis in [the
+implementation document](implementation.md). The file set includes only text
+files with different sizes to more easily see the effect of file size on running
+time and memory usage.
+
+The file set `test/files` comprises text and binary files in various formats and
 sizes. There is also one file filled with random data read from `/dev/urandom`.
 
 The following information was gathered for both algorithms: compression and
@@ -27,9 +34,11 @@ decompression speed, peak memory usage during compression and decompression as
 well as compressed and uncompressed file size for each test file.
 
 Running `make perf-report` generates performance reports for both programs. The
-command requires GNU time to be available in the path. The output is written in
-CSV format to `huffman-stas.csv` and `lz77-stats.csv` for Huffman coding and
-LZ77, respectively.
+command requires GNU time to be available in the path. Data gathered from
+`test/files` is  written in CSV format to `huffman-stas.csv` and
+`lz77-stats.csv` for Huffman coding and LZ77, respectively. Data gathered from
+`test/files/complexity-analysis` is written to `huffman-complexity-stats.csv`
+and `lz77-complexity-stats.csv`.
 
 By default each test file is compressed and decompressed five times and the
 measured runtimes are averaged to improve accuracy. The number of iterations can
