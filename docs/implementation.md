@@ -23,7 +23,7 @@
 
 ### Dependency graph for packages in the project
 
-![dependency graph](images/dependency-graph.png)
+![dependency-graph](images/dependency-graph.png)
 
 ## Complexity analysis
 

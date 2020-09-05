@@ -19,7 +19,25 @@
 
 ### Dependency graph for packages in the project
 
-![dependency graph](images/dependency-graph.png)
+{{ .Graphviz "dependency-graph" `
+digraph G {
+  "cmd/huffman" -> "huffman"
+  "cmd/lz77" -> "lz77"
+  "huffman" -> "util/bits"
+  "huffman" -> "util/bufio"
+  "lz77" -> "util/bits"
+  "lz77" -> "util/bufio"
+  "lz77" -> "util/slices"
+  "util/bits" -> "util/bufio"
+  "util/bits" -> "util/slices"
+  "util/bufio" -> "util/slices"
+  "tools/gendocs"
+  "tools/perftestrunner"
+  "util/testutil" [
+    label=<util/testutil<BR />
+        <FONT POINT-SIZE="10">(Used in unit tests)</FONT>>
+  ];
+}` }}
 
 ## Complexity analysis
 

@@ -91,6 +91,18 @@ set term png size 700,480
 	return imageRef(graphName, path.Join(d.linkPrefix, graphFileName)), nil
 }
 
+func (d *perfData) Graphviz(graphName, commands string) (string, error) {
+	graphFileName := graphName + ".png"
+	graphFilePath := filepath.Join(d.graphDir, graphFileName)
+	cmd := exec.Command("dot", "-Tpng", "-o", graphFilePath)
+	cmd.Stdin = strings.NewReader(commands)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to run dot: %s", string(output))
+	}
+	return imageRef(graphName, path.Join(d.linkPrefix, graphFileName)), nil
+}
+
 func (d *perfData) generateDocument(t *template.Template, outFile string) error {
 	f, err := os.Create(outFile)
 	if err != nil {
