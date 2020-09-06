@@ -99,9 +99,27 @@ is not used when decoding and the window takes relatively little space. This is
 why the memory usage of LZ77 decoding is about the same as for Huffman encoding
 and decoding.
 
+The lines in the first two graphs using data for the regular test files are
+jumpy because file size as well as the type of data in a file affects the
+running time and memory usage. The latter two graphs use data from
+`test/files/complexity-analysis`.
+
+#### File set `test/files`
+
 ![execution-times](images/execution-times.png)
 
 ![memory-usage](images/memory-usage.png)
+
+#### File set `test/files/complexity-analysis`
+
+![execution-times-complexity](images/execution-times-complexity.png)
+
+![memory-usage-complexity](images/memory-usage-complexity.png)
+
+## Possible improvements
+
+I didn't notice any bugs in either algorithm, but both can most likely be
+greatly optimized from their current state.
 
 ## Sources
 
@@ -111,3 +129,4 @@ and decoding.
 - Sadakane, Kunihiko & Imai, Hiroshi. (2000). Improving the Speed of LZ77
   Compression by Hashing and Suffix Sorting. IEICE Transactions on Fundamentals
   of Electronics Communications and Computer Sciences. E83A. 
+- http://michael.dipperstein.com/lzss/

@@ -113,7 +113,38 @@ is not used when decoding and the window takes relatively little space. This is
 why the memory usage of LZ77 decoding is about the same as for Huffman encoding
 and decoding.
 
+The lines in the first two graphs using data for the regular test files are
+jumpy because file size as well as the type of data in a file affects the
+running time and memory usage. The latter two graphs use data from
+`test/files/complexity-analysis`.
+
+#### File set `test/files`
+
 {{ .Gnuplot "execution-times" `
+set title "Compression and decompression times"
+set xlabel "File size (B)"
+set ylabel "Execution time (s)"
+set key left top
+plot Huffman using 6:2 skip 1 smooth unique title "Huffman coding compression", \
+  Huffman using 6:4 skip 1 smooth unique title "Huffman coding decompression", \
+  LZ77 using 6:2 skip 1 smooth unique title "LZ77 compression", \
+  LZ77 using 6:4 skip 1 smooth unique title "LZ77 decompression"
+` }}
+
+{{ .Gnuplot "memory-usage" `
+set title "Compression and decompression peak memory usage"
+set xlabel "File size (B)"
+set ylabel "Peak memory usage (B)"
+set key right top
+plot Huffman using 6:3 skip 1 smooth unique title "Huffman coding compression", \
+  Huffman using 6:5 skip 1 smooth unique title "Huffman coding decompression", \
+  LZ77 using 6:3 skip 1 smooth unique title "LZ77 compression", \
+  LZ77 using 6:5 skip 1 smooth unique title "LZ77 decompression"
+` }}
+
+#### File set `test/files/complexity-analysis`
+
+{{ .Gnuplot "execution-times-complexity" `
 set title "Compression and decompression times"
 set xlabel "File size (B)"
 set ylabel "Execution time (s)"
@@ -124,7 +155,7 @@ plot HuffmanComplexity using 6:2 skip 1 smooth unique title "Huffman coding comp
   LZ77Complexity using 6:4 skip 1 smooth unique title "LZ77 decompression"
 ` }}
 
-{{ .Gnuplot "memory-usage" `
+{{ .Gnuplot "memory-usage-complexity" `
 set title "Compression and decompression peak memory usage"
 set xlabel "File size (B)"
 set ylabel "Peak memory usage (B)"
@@ -148,3 +179,4 @@ greatly optimized from their current state.
 - Sadakane, Kunihiko & Imai, Hiroshi. (2000). Improving the Speed of LZ77
   Compression by Hashing and Suffix Sorting. IEICE Transactions on Fundamentals
   of Electronics Communications and Computer Sciences. E83A. 
+- http://michael.dipperstein.com/lzss/
