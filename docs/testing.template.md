@@ -20,7 +20,8 @@ sizes for comparing the overall performance of the algorithms. The latter file
 set is used specifically for time and space complexity analysis in [the
 implementation document](implementation.md). The file set includes only text
 files with different sizes to more easily see the effect of file size on running
-time and memory usage.
+time and memory usage, because different types of files have very different
+constant factors for time and space complexity.
 
 The file set `test/files` comprises text and binary files in various formats and
 sizes. There is also one file filled with random data read from `/dev/urandom`.
@@ -63,10 +64,18 @@ compress very well with Huffman coding either. In fact, compressing
 caused by not getting enough space savings from repeated data to outweight the
 additional space required by metadata needed for decompression.
 
+### Huffman coding performance test results
+
 {{ .HuffmanTable }}
 
-<h3 align="center">Huffman coding performance test results</h3>
+### LZ77 performance test results
 
 {{ .LZ77Table }}
 
-<h3 align="center">LZ77 performance test results</h3>
+## Sources
+
+Test files are from the following websites:
+  - http://sun.aei.polsl.pl/~sdeor/index.php?page=silesia
+  - https://corpus.canterbury.ac.nz/descriptions/#cantrbry
+  - http://www.gutenberg.org/ebooks/7000
+  - https://pixabay.com/photos/regensburg-high-resolution-panorama-4423626/
