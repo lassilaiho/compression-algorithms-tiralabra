@@ -65,3 +65,4 @@ Because generating the performance report is so slow, it is not done automatical
 - [Week 4](docs/weekly-reports/week4.md)
 - [Week 5](docs/weekly-reports/week5.md)
 - [Week 6](docs/weekly-reports/week6.md)
+- [Week 7](docs/weekly-reports/week7.md)
