@@ -2,6 +2,10 @@
 
 ## Building the project
 
+You can download pre-built binaries from the [releases
+page](https://github.com/lassilaiho/compression-algorithms-tiralabra/releases/tag/final-version)
+or you can build the programs yourself.
+
 Building the programs requires Go version 1.14 or later and GNU Make. Command
 line programs can be built by running `make all` at the root of the repository.
 
