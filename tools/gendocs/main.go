@@ -1,3 +1,6 @@
+// gendocs generates documentation from templates. The templates are MarkDown
+// files ending in .template.md and are processed as templates using the
+// standard library package "text/templates".
 package main
 
 import (
@@ -16,6 +19,7 @@ import (
 
 var showHelp bool
 
+// Define command line parameters.
 func init() {
 	flag.BoolVar(&showHelp, "help", false, "print help message")
 	flag.Usage = func() {
@@ -30,18 +34,24 @@ func init() {
 	flag.Parse()
 }
 
+// perfData is used as the context for templates.
 type perfData struct {
+	// Tables as MarkDown formatted strings
 	HuffmanTable, LZ77Table string
 
+	// Paths to test result files
 	huffmanFile           string
 	lz77File              string
 	huffmanComplexityFile string
 	lz77ComplexityFile    string
 
-	graphDir   string
-	linkPrefix string
+	graphDir   string // Directory where generated graphs are stored
+	linkPrefix string // Prefix used for MarkDown links
 }
 
+// loadPerfData loads performance data from dataDir and prepares it for use with
+// templates. Generated graphs are stored in graphDir and links are prefixed
+// with linkPrefix.
 func loadPerfData(dataDir, graphDir, linkPrefix string) (*perfData, error) {
 	data := &perfData{
 		huffmanFile:           filepath.Join(dataDir, "huffman-stats.csv"),
@@ -64,6 +74,10 @@ func loadPerfData(dataDir, graphDir, linkPrefix string) (*perfData, error) {
 	return data, nil
 }
 
+// Gnuplot generates a graph using gnuplot. The file name is graphName suffixed
+// with the file format. commands is the script used to generate the graph. Some
+// default settings and variables are set automatically. Gnuplot returns a
+// MarkDown image reference on success and an error value on failure.
 func (d *perfData) Gnuplot(graphName, commands string) (string, error) {
 	graphFileName := graphName + ".png"
 	graphFilePath := filepath.Join(d.graphDir, graphFileName)
@@ -91,6 +105,10 @@ set term png size 700,480
 	return imageRef(graphName, path.Join(d.linkPrefix, graphFileName)), nil
 }
 
+// Graphviz generates a graph using Graphviz. The file name is graphName
+// suffixed with the file format. commands is the script used to generate the
+// graph. Graphviz returns a MarkDown image reference on success and an error
+// value on failure.
 func (d *perfData) Graphviz(graphName, commands string) (string, error) {
 	graphFileName := graphName + ".png"
 	graphFilePath := filepath.Join(d.graphDir, graphFileName)
@@ -103,6 +121,8 @@ func (d *perfData) Graphviz(graphName, commands string) (string, error) {
 	return imageRef(graphName, path.Join(d.linkPrefix, graphFileName)), nil
 }
 
+// generateDocument generates a document using template t and data from d. The
+// file is written to outFile.
 func (d *perfData) generateDocument(t *template.Template, outFile string) error {
 	f, err := os.Create(outFile)
 	if err != nil {
@@ -120,10 +140,12 @@ func (d *perfData) generateDocument(t *template.Template, outFile string) error 
 	return t.Execute(f, d)
 }
 
+// imageRef returns a MarkDown image reference with name and path.
 func imageRef(name, path string) string {
 	return "![" + name + "](" + path + ")"
 }
 
+// repeat returns a slice with n copies of s.
 func repeat(s string, n int) []string {
 	xs := make([]string, n)
 	for i := range xs {
@@ -132,6 +154,7 @@ func repeat(s string, n int) []string {
 	return xs
 }
 
+// formatTableRow formats row as MarkDown and writes the result to b.
 func formatTableRow(b *strings.Builder, row []string) {
 	for _, cell := range row {
 		b.WriteString("| ")
@@ -141,6 +164,8 @@ func formatTableRow(b *strings.Builder, row []string) {
 	b.WriteString("|\n")
 }
 
+// formatTable formats data as a MarkDown table. If data has at least one row,
+// the first row is considered to be a header row.
 func formatTable(data [][]string) string {
 	if len(data) == 0 {
 		return ""
@@ -154,6 +179,7 @@ func formatTable(data [][]string) string {
 	return b.String()
 }
 
+// readData reads CSV data from file.
 func readData(file string) ([][]string, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -169,7 +195,7 @@ func run() error {
 		return nil
 	}
 	if flag.NArg() != 2 {
-		return errors.New("expected 2 argument")
+		return errors.New("expected 2 arguments")
 	}
 	tmpldir := flag.Arg(0)
 	dataDir := flag.Arg(1)

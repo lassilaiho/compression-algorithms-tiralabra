@@ -1,3 +1,4 @@
+// perftestrunner runs performance tests on test files.
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 	"time"
 )
 
+// Command line parameters
 var (
 	command        string
 	inputDir       string
@@ -22,6 +24,7 @@ var (
 	iterationCount int
 )
 
+// init defines command line flags
 func init() {
 	flag.StringVar(&command, "cmd", "", "(required) command to test")
 	flag.StringVar(&inputDir, "dir", "", "(required) directory to read input files from")
@@ -41,6 +44,7 @@ func init() {
 	flag.Parse()
 }
 
+// runResult contains data for either compression or decompression.
 type runResult struct {
 	averageTime        time.Duration
 	averageMaxMemUsage int
@@ -51,10 +55,13 @@ func (r *runResult) setAverage(iterations int) {
 	r.averageMaxMemUsage /= iterations
 }
 
+// averageTimeString formats r.averageTime as a time string displaying seconds.
 func (r *runResult) averageTimeString() string {
 	return strconv.FormatFloat(float64(r.averageTime)/float64(time.Second), 'f', 3, 64)
 }
 
+// testResult is the result of a single test run on a file, both compression and
+// decompression.
 type testResult struct {
 	file             string
 	compression      runResult
@@ -63,10 +70,12 @@ type testResult struct {
 	uncompressedSize int
 }
 
+// spaceSavings returns the space savings as a percentage.
 func (r *testResult) spaceSavings() float64 {
 	return 100 * (1 - float64(r.compressedSize)/float64(r.uncompressedSize))
 }
 
+// cmdTimeError is returned if timing a command failed.
 type cmdTimeError struct {
 	output string
 	err    error
@@ -76,6 +85,7 @@ func (err *cmdTimeError) Error() string {
 	return err.err.Error() + ", output: " + err.output
 }
 
+// timeCommand times cmd and adds the results to result.
 func timeCommand(result *runResult, cmd ...string) error {
 	c := exec.Command("time", append([]string{"-f", "%e;%M"}, cmd...)...)
 	output, err := c.CombinedOutput()
@@ -102,6 +112,9 @@ func timeCommand(result *runResult, cmd ...string) error {
 	return nil
 }
 
+// runTest tests command using given input and output files. iterations
+// specifies how many iterations are run to compute the average results. A
+// testResult is returned on success and an error value on error conditions
 func runTest(command, inputFile, outputFile string, iterations int) (*testResult, error) {
 	compressionOut := outputFile + ".compressed"
 	decompressionOut := outputFile + ".decompressed"
@@ -135,6 +148,7 @@ func runTest(command, inputFile, outputFile string, iterations int) (*testResult
 	return t, nil
 }
 
+// printResults prints results in CSV format to stdout.
 func printResults(results []*testResult) {
 	w := csv.NewWriter(os.Stdout)
 	w.Write([]string{

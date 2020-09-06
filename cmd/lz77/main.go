@@ -1,3 +1,5 @@
+// This is a command line interface for LZ77 compression and decompression
+// algorithms.
 package main
 
 import (

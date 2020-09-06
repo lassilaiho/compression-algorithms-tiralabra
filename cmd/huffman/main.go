@@ -1,3 +1,5 @@
+// This is a command line interface for Huffman coding compression and
+// decompression algorithms.
 package main
 
 import (
